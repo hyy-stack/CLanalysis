@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { WebClient } from '@slack/web-api';
-import { getDealById, getInteractionsForDeal, getManualEmailsForDeal } from '@/lib/db/client';
+import { getDealById, getInteractionsForDeal, getManualEmailsForDeal, getLatestAnalysis } from '@/lib/db/client';
 
 /**
  * Slack Interactions Handler
@@ -28,6 +28,7 @@ export async function POST(request: NextRequest) {
     // Handle button clicks
     if (payload.type === 'block_actions' && payload.actions?.[0]) {
       const action = payload.actions[0];
+      const slackClient = new WebClient(process.env.SLACK_BOT_TOKEN!);
       
       if (action.action_id === 'show_interactions') {
         // Get deal ID from button value
@@ -38,7 +39,6 @@ export async function POST(request: NextRequest) {
         const manualEmails = await getManualEmailsForDeal(dealId);
         
         // Post interactions to the thread
-        const slackClient = new WebClient(process.env.SLACK_BOT_TOKEN!);
         await postInteractionsToThread(
           slackClient,
           payload.channel.id,
@@ -46,6 +46,31 @@ export async function POST(request: NextRequest) {
           interactions,
           manualEmails
         );
+        
+        // Acknowledge the interaction
+        return NextResponse.json({ ok: true });
+      }
+      
+      if (action.action_id === 'download_full_analysis') {
+        // Upload full analysis as a file
+        const dealId = action.value;
+        const deal = await getDealById(dealId);
+        
+        if (deal) {
+          const { getLatestAnalysis } = await import('@/lib/db/client');
+          const analysis = await getLatestAnalysis(deal.id);
+          
+          if (analysis && analysis.details?.fullText) {
+            await slackClient.files.uploadV2({
+              channel_id: payload.channel.id,
+              thread_ts: payload.message.ts,
+              file: Buffer.from(analysis.details.fullText),
+              filename: `${deal.name.replace(/[^a-z0-9]/gi, '-')}-analysis.md`,
+              title: '📊 Complete Analysis Report',
+              initial_comment: `Full analysis for ${deal.name}`,
+            });
+          }
+        }
         
         // Acknowledge the interaction
         return NextResponse.json({ ok: true });

@@ -293,9 +293,9 @@ export class SlackClient {
     
     console.log('[Slack] Thread message posted:', threadMessage.ts);
     
-    // Post full analysis as a collapsible section using Slack blocks
+    // Post full analysis using plain text (Slack auto-adds "Show more" for text > 3000 chars)
     if (analysis.details?.fullText) {
-      console.log('[Slack] Posting full analysis as collapsible text');
+      console.log('[Slack] Posting full analysis with auto-collapse');
       
       // Clean the markdown for Slack
       const cleanedText = analysis.details.fullText
@@ -303,53 +303,13 @@ export class SlackClient {
         .replace(/\*\*([^*]+)\*\*/g, '*$1*') // Convert **bold** to *bold*
         .trim();
       
-      // Split into preview (first 1000 chars) and rest
-      const preview = cleanedText.substring(0, 1000);
-      const hasMore = cleanedText.length > 1000;
-      
-      const detailBlocks: any[] = [
-        {
-          type: 'section',
-          text: {
-            type: 'mrkdwn',
-            text: `📊 *Complete Analysis Report*\n\n${preview}${hasMore ? '...' : ''}`,
-          },
-        },
-      ];
-      
-      // If there's more content, offer to upload as file
-      if (hasMore) {
-        detailBlocks.push({
-          type: 'context',
-          elements: [
-            {
-              type: 'mrkdwn',
-              text: `_Full analysis is ${Math.round(cleanedText.length / 1000)}K characters. Click below to download complete report._`,
-            },
-          ],
-        });
-        
-        detailBlocks.push({
-          type: 'actions',
-          elements: [
-            {
-              type: 'button',
-              text: {
-                type: 'plain_text',
-                text: '📥 Download Full Report',
-              },
-              action_id: 'download_full_analysis',
-              value: analysis.id || deal.id,
-            },
-          ],
-        });
-      }
-      
+      // Post as simple text message - Slack will auto-add "Show more" if > 3000 chars
       await this.client.chat.postMessage({
         channel: this.channelId,
         thread_ts: threadTs,
-        text: 'Complete Analysis Report',
-        blocks: detailBlocks,
+        text: `📊 *Complete Analysis Report*\n\n${cleanedText}`,
+        unfurl_links: false,
+        unfurl_media: false,
       });
       
       console.log('[Slack] Full analysis posted');
