@@ -173,15 +173,65 @@ export async function includeInteraction(interactionId: string): Promise<void> {
 }
 
 /**
- * Get all manual emails for a deal
+ * Exclude a manual email from future analyses
  */
-export async function getManualEmailsForDeal(dealId: string): Promise<ManualEmail[]> {
+export async function excludeManualEmail(emailId: string): Promise<void> {
+  await sql`
+    UPDATE manual_emails
+    SET import_batch_id = COALESCE(import_batch_id, '') || '|EXCLUDED'
+    WHERE id = ${emailId}
+    AND import_batch_id NOT LIKE '%|EXCLUDED'
+  `;
+}
+
+/**
+ * Include a previously excluded manual email
+ */
+export async function includeManualEmail(emailId: string): Promise<void> {
+  await sql`
+    UPDATE manual_emails
+    SET import_batch_id = REPLACE(import_batch_id, '|EXCLUDED', '')
+    WHERE id = ${emailId}
+  `;
+}
+
+/**
+ * Get excluded manual emails for a deal
+ */
+export async function getExcludedManualEmailsForDeal(dealId: string): Promise<ManualEmail[]> {
   const result = await sql`
     SELECT * FROM manual_emails
     WHERE deal_id = ${dealId}
+    AND import_batch_id LIKE '%|EXCLUDED'
     ORDER BY timestamp ASC
   `;
   
+  return result.rows as ManualEmail[];
+}
+
+/**
+ * Get all manual emails for a deal
+ * By default, excludes flagged emails
+ */
+export async function getManualEmailsForDeal(dealId: string, includeExcluded: boolean = false): Promise<ManualEmail[]> {
+  let query;
+  
+  if (includeExcluded) {
+    query = sql`
+      SELECT * FROM manual_emails
+      WHERE deal_id = ${dealId}
+      ORDER BY timestamp ASC
+    `;
+  } else {
+    query = sql`
+      SELECT * FROM manual_emails
+      WHERE deal_id = ${dealId}
+      AND (import_batch_id IS NULL OR import_batch_id NOT LIKE '%|EXCLUDED')
+      ORDER BY timestamp ASC
+    `;
+  }
+  
+  const result = await query;
   return result.rows as ManualEmail[];
 }
 

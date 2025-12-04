@@ -30,9 +30,11 @@ export class SlackClient {
   ): Promise<string> {
     console.log('[Slack] Posting analysis for deal:', deal.name);
     
-    // Check for excluded interactions
-    const { getExcludedInteractionsForDeal } = await import('@/lib/db/client');
-    const excludedCount = (await getExcludedInteractionsForDeal(deal.id)).length;
+    // Check for excluded interactions and emails
+    const { getExcludedInteractionsForDeal, getExcludedManualEmailsForDeal } = await import('@/lib/db/client');
+    const excludedInteractions = await getExcludedInteractionsForDeal(deal.id);
+    const excludedEmails = await getExcludedManualEmailsForDeal(deal.id);
+    const excludedCount = excludedInteractions.length + excludedEmails.length;
     
     // Extract health score from analysis
     const healthScore = this.extractHealthScore(analysis);

@@ -6,8 +6,11 @@ import {
   getManualEmailsForDeal, 
   getLatestAnalysis,
   getExcludedInteractionsForDeal,
+  getExcludedManualEmailsForDeal,
   excludeInteraction,
   includeInteraction,
+  excludeManualEmail,
+  includeManualEmail,
 } from '@/lib/db/client';
 
 /**
@@ -86,11 +89,19 @@ export async function POST(request: NextRequest) {
       
       if (action.action_id === 'exclude_interaction') {
         // Exclude interaction from future analyses
-        const interactionId = action.value;
-        console.log('[Slack Interaction] Excluding interaction:', interactionId);
+        const value = action.value;
+        console.log('[Slack Interaction] Excluding:', value);
         
-        await excludeInteraction(interactionId);
-        console.log('[Slack Interaction] Interaction excluded in DB');
+        // Parse table:id format
+        const [table, id] = value.split(':');
+        
+        if (table === 'interactions') {
+          await excludeInteraction(id);
+        } else if (table === 'manual_emails') {
+          await excludeManualEmail(id);
+        }
+        
+        console.log('[Slack Interaction] Excluded in DB');
         
         // Update the message to show it's excluded
         await slackClient.chat.update({
@@ -114,37 +125,35 @@ export async function POST(request: NextRequest) {
       
       if (action.action_id === 'include_interaction') {
         // Re-include a previously excluded interaction
-        const interactionId = action.value;
+        const value = action.value;
+        console.log('[Slack Interaction] Including:', value);
         
-        await includeInteraction(interactionId);
+        // Parse table:id format
+        const [table, id] = value.split(':');
         
-        // Fetch the interaction to get its details
-        const { sql } = await import('@vercel/postgres');
-        const result = await sql`SELECT * FROM interactions WHERE id = ${interactionId}`;
-        const interaction = result.rows[0];
-        
-        if (interaction) {
-          const type = interaction.type === 'call' ? '📞 Call' : '📧 Email';
-          const date = new Date(interaction.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-          const time = new Date(interaction.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-          let text = `${type}: *${interaction.title}*\n   ${date} at ${time}`;
-          
-          // Update message to show it's included again
-          await slackClient.chat.update({
-            channel: payload.channel.id,
-            ts: payload.message.ts,
-            text,
-            blocks: [
-              {
-                type: 'section',
-                text: {
-                  type: 'mrkdwn',
-                  text: `${text}\n_Re-included in analyses_`,
-                },
-              },
-            ],
-          });
+        if (table === 'interactions') {
+          await includeInteraction(id);
+        } else if (table === 'manual_emails') {
+          await includeManualEmail(id);
         }
+        
+        console.log('[Slack Interaction] Re-included in DB');
+        
+        // Update message to show it's included again
+        await slackClient.chat.update({
+          channel: payload.channel.id,
+          ts: payload.message.ts,
+          text: payload.message.text.replace(/^~|~$/g, ''), // Remove strikethrough
+          blocks: [
+            {
+              type: 'section',
+              text: {
+                type: 'mrkdwn',
+                text: `${payload.message.text.replace(/^~|~$/g, '')}\n_Re-included in analyses_`,
+              },
+            },
+          ],
+        });
         
         return NextResponse.json({ ok: true });
       }
@@ -152,13 +161,15 @@ export async function POST(request: NextRequest) {
       if (action.action_id === 'show_excluded') {
         // Show excluded interactions
         const dealId = action.value;
-        const excluded = await getExcludedInteractionsForDeal(dealId);
+        const excludedInteractions = await getExcludedInteractionsForDeal(dealId);
+        const excludedEmails = await getExcludedManualEmailsForDeal(dealId);
         
         await postExcludedInteractions(
           slackClient,
           payload.channel.id,
           payload.message.ts,
-          excluded
+          excludedInteractions,
+          excludedEmails
         );
         
         return NextResponse.json({ ok: true });
@@ -216,10 +227,11 @@ async function postInteractionsToThread(
   interactions: any[],
   manualEmails: any[]
 ) {
-  // Combine all interactions with their IDs
+  // Combine all interactions with their IDs and table source
   const allItems = [
     ...interactions.map(i => ({
       id: i.id,
+      table: 'interactions',
       type: i.type === 'call' ? '📞 Call' : '📧 Email',
       title: i.title || 'Untitled',
       timestamp: new Date(i.timestamp),
@@ -227,6 +239,7 @@ async function postInteractionsToThread(
     })),
     ...manualEmails.map(e => ({
       id: e.id,
+      table: 'manual_emails',
       type: '📧 Email',
       title: e.subject,
       timestamp: new Date(e.timestamp),
@@ -303,7 +316,7 @@ async function postInteractionsToThread(
               text: '🗑️ Exclude',
             },
             action_id: 'exclude_interaction',
-            value: item.id,
+            value: `${item.table}:${item.id}`, // Pass table:id so we know which table to update
             style: 'danger',
             confirm: {
               title: {
@@ -337,9 +350,15 @@ async function postExcludedInteractions(
   client: WebClient,
   channel: string,
   threadTs: string,
-  excludedInteractions: any[]
+  excludedInteractions: any[],
+  excludedEmails: any[]
 ) {
-  if (excludedInteractions.length === 0) {
+  const allExcluded = [
+    ...excludedInteractions.map(i => ({ ...i, table: 'interactions' })),
+    ...excludedEmails.map(e => ({ ...e, table: 'manual_emails' })),
+  ];
+  
+  if (allExcluded.length === 0) {
     await client.chat.postMessage({
       channel,
       thread_ts: threadTs,
@@ -366,7 +385,7 @@ async function postExcludedInteractions(
         elements: [
           {
             type: 'mrkdwn',
-            text: `These ${excludedInteractions.length} interaction${excludedInteractions.length !== 1 ? 's are' : ' is'} excluded from analysis. Click to re-include.`,
+            text: `These ${allExcluded.length} interaction${allExcluded.length !== 1 ? 's are' : ' is'} excluded from analysis. Click to re-include.`,
           },
         ],
       },
@@ -374,11 +393,12 @@ async function postExcludedInteractions(
   });
   
   // Post each excluded interaction with include button
-  for (const interaction of excludedInteractions) {
-    const type = interaction.type === 'call' ? '📞 Call' : '📧 Email';
-    const date = new Date(interaction.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    const time = new Date(interaction.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-    const text = `~${type}: ${interaction.title}~\n   ${date} at ${time}`;
+  for (const item of allExcluded) {
+    const type = item.type === 'call' ? '📞 Call' : '📧 Email';
+    const title = item.title || item.subject;
+    const date = new Date(item.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const time = new Date(item.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    const text = `~${type}: ${title}~\n   ${date} at ${time}`;
     
     await client.chat.postMessage({
       channel,
@@ -398,7 +418,7 @@ async function postExcludedInteractions(
               text: '✅ Include',
             },
             action_id: 'include_interaction',
-            value: interaction.id,
+            value: `${item.table}:${item.id}`, // Pass table:id format
             style: 'primary',
           },
         },
