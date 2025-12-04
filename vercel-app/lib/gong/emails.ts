@@ -31,10 +31,20 @@ export async function enrichDealWithEmails(
       // Fetch email data for this participant
       const emailData = await gongClient.getEmailsForAddress(party.emailAddress);
       
-      if (!emailData || !emailData.contentUrl) {
-        console.log(`[Email Enrichment] No content URL for ${party.emailAddress}`);
+      console.log(`[Email Enrichment] Email data response:`, JSON.stringify(emailData)?.substring(0, 500));
+      
+      if (!emailData) {
+        console.log(`[Email Enrichment] No email data returned for ${party.emailAddress}`);
         continue;
       }
+      
+      if (!emailData.contentUrl) {
+        console.log(`[Email Enrichment] No content URL for ${party.emailAddress}`);
+        console.log(`[Email Enrichment] Response keys:`, Object.keys(emailData));
+        continue;
+      }
+      
+      console.log(`[Email Enrichment] Fetching content from: ${emailData.contentUrl}`);
       
       // Fetch the actual email content from contentUrl
       const contentResponse = await fetch(emailData.contentUrl);
@@ -44,6 +54,7 @@ export async function enrichDealWithEmails(
       }
       
       const content = await contentResponse.json();
+      console.log(`[Email Enrichment] Content structure:`, Object.keys(content));
       
       // Parse emails from content
       const emails = extractEmailsFromContent(content);
