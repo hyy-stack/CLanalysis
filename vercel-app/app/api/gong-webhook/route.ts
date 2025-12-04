@@ -18,30 +18,29 @@ export async function POST(request: NextRequest) {
     
     console.log('[Gong Webhook] Received webhook');
     
-    // Verify webhook signature
-    const signature = request.headers.get('x-gong-signature') || 
-                     request.headers.get('x-hub-signature-256') || 
-                     request.headers.get('x-gong-request-signature') || '';
+    // Verify webhook JWT signature
+    const authHeader = request.headers.get('authorization') || '';
     
-    if (!signature) {
-      console.error('[Gong Webhook] No signature header found');
-      return NextResponse.json({ error: 'Missing signature' }, { status: 401 });
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      console.error('[Gong Webhook] No JWT token in Authorization header');
+      return NextResponse.json({ error: 'Missing authentication' }, { status: 401 });
     }
     
-    const webhookSecret = process.env.GONG_WEBHOOK_SECRET;
-    if (!webhookSecret) {
-      console.error('[Gong Webhook] GONG_WEBHOOK_SECRET not configured');
+    const gongPublicKey = process.env.GONG_WEBHOOK_PUBLIC_KEY;
+    if (!gongPublicKey) {
+      console.error('[Gong Webhook] GONG_WEBHOOK_PUBLIC_KEY not configured');
       return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
     }
     
-    const isValid = verifyGongWebhook(rawBody, signature, webhookSecret);
+    const { verifyGongWebhookJWT } = await import('@/lib/gong/webhook');
+    const isValid = verifyGongWebhookJWT(authHeader, gongPublicKey);
     
     if (!isValid) {
-      console.error('[Gong Webhook] Invalid signature');
+      console.error('[Gong Webhook] Invalid JWT signature');
       return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
     }
     
-    console.log('[Gong Webhook] ✓ Signature verified');
+    console.log('[Gong Webhook] ✓ JWT signature verified');
     
     // Parse webhook payload
     const payload = parseGongWebhook(body);
