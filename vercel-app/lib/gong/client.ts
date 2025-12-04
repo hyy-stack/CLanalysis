@@ -73,6 +73,45 @@ export class GongClient {
   }
 
   /**
+   * List calls by CRM opportunity ID
+   * Attempts to use Gong's CRM integration
+   */
+  async listCallsByCrmId(crmId: string, fromDate?: string, toDate?: string): Promise<GongCall[]> {
+    const endpoint = `/v2/calls/extensive`;
+    
+    try {
+      const requestBody: any = {
+        filter: {
+          companyCrmIds: [crmId],
+        },
+        contentSelector: {
+          exposedFields: {
+            content: true,
+            structure: true,
+          },
+        },
+      };
+      
+      if (fromDate) {
+        requestBody.filter.fromDateTime = new Date(fromDate).toISOString();
+      }
+      if (toDate) {
+        requestBody.filter.toDateTime = new Date(toDate).toISOString();
+      }
+      
+      const response = await this.request<any>(endpoint, {
+        method: 'POST',
+        body: JSON.stringify(requestBody),
+      });
+      
+      return response.calls || [];
+    } catch (error) {
+      console.error('[Gong Client] CRM filtering failed:', error);
+      return [];
+    }
+  }
+
+  /**
    * Get transcript for a specific call
    */
   async getCallTranscript(callId: string, callDate?: string): Promise<{ callTranscripts: GongTranscript[] }> {
