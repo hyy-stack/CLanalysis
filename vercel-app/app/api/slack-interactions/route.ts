@@ -222,7 +222,10 @@ export async function POST(request: NextRequest) {
           
           fetch(`${baseUrl}/api/analyze-deal`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+              'Content-Type': 'application/json',
+              'X-Internal-Call': 'internal', // Mark as internal call to bypass API key
+            },
             body: JSON.stringify({ dealId: deal.id }),
           }).catch(err => {
             console.error('[Slack Interaction] Analysis trigger failed:', err);
