@@ -18,11 +18,21 @@ export async function POST(request: NextRequest) {
     
     console.log('[Gong Webhook] Received webhook');
     
-    // Verify webhook JWT signature
-    const authHeader = request.headers.get('authorization') || '';
+    // Log all headers for debugging
+    const headers: Record<string, string> = {};
+    request.headers.forEach((value, key) => {
+      headers[key] = value;
+    });
+    console.log('[Gong Webhook] Headers:', JSON.stringify(headers, null, 2));
     
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      console.error('[Gong Webhook] No JWT token in Authorization header');
+    // Verify webhook JWT signature
+    const authHeader = request.headers.get('authorization') || 
+                      request.headers.get('x-gong-signature') ||
+                      request.headers.get('x-gong-authorization') || '';
+    
+    if (!authHeader) {
+      console.error('[Gong Webhook] No authentication header found');
+      console.error('[Gong Webhook] Available headers:', Object.keys(headers));
       return NextResponse.json({ error: 'Missing authentication' }, { status: 401 });
     }
     
