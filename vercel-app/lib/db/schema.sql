@@ -54,6 +54,7 @@ CREATE TABLE IF NOT EXISTS manual_emails (
   timestamp TIMESTAMP WITH TIME ZONE NOT NULL,
   blob_url TEXT NOT NULL,
   import_batch_id VARCHAR(100),
+  metadata JSONB, -- Additional metadata including exclusion flag
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
