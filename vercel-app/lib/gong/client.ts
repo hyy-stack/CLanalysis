@@ -152,12 +152,41 @@ export class GongClient {
     console.log(`[Gong Client] Calling ${endpoint}?${params}`);
     
     try {
-      const response = await this.request<any>(`${endpoint}?${params}`);
+      // Add timeout to prevent hanging
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      
+      const url = `${this.baseUrl}${endpoint}?${params}`;
+      console.log(`[Gong Client] Fetching: ${url}`);
+      
+      const fetchResponse = await fetch(url, {
+        headers: {
+          'Authorization': this.getAuthHeader(),
+          'Content-Type': 'application/json',
+        },
+        signal: controller.signal,
+      });
+      
+      clearTimeout(timeoutId);
+      
+      console.log(`[Gong Client] Response status: ${fetchResponse.status}`);
+      
+      if (!fetchResponse.ok) {
+        const errorText = await fetchResponse.text();
+        console.error(`[Gong Client] API error (${fetchResponse.status}):`, errorText);
+        return null;
+      }
+      
+      const response = await fetchResponse.json();
       console.log(`[Gong Client] Response received, keys:`, response ? Object.keys(response) : 'null');
       return response;
-    } catch (error) {
-      console.error(`[Gong Client] Failed to fetch emails for ${emailAddress}:`, error);
-      throw error; // Throw instead of returning null so we can see the error
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        console.error(`[Gong Client] Request timeout for ${emailAddress}`);
+      } else {
+        console.error(`[Gong Client] Failed to fetch emails for ${emailAddress}:`, error);
+      }
+      return null;
     }
   }
 

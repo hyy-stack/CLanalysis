@@ -18,15 +18,18 @@ export async function enrichDealWithEmails(
   gongClient: GongClient
 ): Promise<void> {
   console.log(`[Email Enrichment] Starting for deal ${dealId} with ${externalParties.length} external parties`);
+  console.log(`[Email Enrichment] Party emails:`, externalParties.map(p => p.emailAddress).join(', '));
   
-  for (const party of externalParties) {
+  for (let i = 0; i < externalParties.length; i++) {
+    const party = externalParties[i];
+    
     if (!party.emailAddress) {
-      console.log(`[Email Enrichment] Skipping party without email: ${party.name}`);
+      console.log(`[Email Enrichment] [${i + 1}/${externalParties.length}] Skipping party without email: ${party.name}`);
       continue;
     }
     
     try {
-      console.log(`[Email Enrichment] Fetching emails for ${party.emailAddress}`);
+      console.log(`[Email Enrichment] [${i + 1}/${externalParties.length}] Fetching emails for ${party.emailAddress}`);
       
       // Fetch email data for this participant
       let emailData;
@@ -113,11 +116,14 @@ export async function enrichDealWithEmails(
       }
       
     } catch (error) {
-      console.error(`[Email Enrichment] Error processing ${party.emailAddress}:`, error);
+      console.error(`[Email Enrichment] [${i + 1}/${externalParties.length}] Error processing ${party.emailAddress}:`, error);
+      // Continue to next party even if this one fails
     }
+    
+    console.log(`[Email Enrichment] [${i + 1}/${externalParties.length}] Completed processing ${party.emailAddress}`);
   }
   
-  console.log(`[Email Enrichment] Complete for deal ${dealId}`);
+  console.log(`[Email Enrichment] Complete for deal ${dealId} - processed all ${externalParties.length} parties`);
 }
 
 /**
