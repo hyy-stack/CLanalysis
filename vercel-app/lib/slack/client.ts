@@ -88,6 +88,38 @@ export class SlackClient {
       fields: dealFields,
     });
     
+    // Add action buttons to main message
+    const mainActions: any[] = [];
+    
+    // View Deal Data button
+    mainActions.push({
+      type: 'button',
+      text: {
+        type: 'plain_text',
+        text: '📊 View Deal Data',
+      },
+      url: `https://anrok-deal-analyzer.vercel.app/api/view-deal?crmId=${encodeURIComponent(deal.crm_id)}`,
+    });
+    
+    // View in Salesforce button if applicable
+    const crmUrl = this.getCrmUrl(deal.crm_id);
+    if (crmUrl) {
+      mainActions.push({
+        type: 'button',
+        text: {
+          type: 'plain_text',
+          text: '🔗 Open in Salesforce',
+        },
+        url: crmUrl,
+        style: 'primary',
+      });
+    }
+    
+    mainBlocks.push({
+      type: 'actions',
+      elements: mainActions,
+    });
+    
     // Add a subtle divider
     mainBlocks.push({ type: 'divider' });
     
@@ -118,10 +150,10 @@ export class SlackClient {
       await this.postThreadedAnalysis(threadTs, analysis, deal);
       console.log('[Slack] Thread details posted successfully');
       
-      // Post interactions timeline if available
-      if (interactions.length > 0 || manualEmails.length > 0) {
-        await this.postInteractionsTimeline(threadTs, interactions, manualEmails);
-      }
+      // Don't auto-post interactions - let users click "View Deal Data" button instead
+      // if (interactions.length > 0 || manualEmails.length > 0) {
+      //   await this.postInteractionsTimeline(threadTs, interactions, manualEmails);
+      // }
     } catch (error) {
       console.error('[Slack] Failed to post thread details:', error);
       // Post a simple fallback message
@@ -185,46 +217,56 @@ export class SlackClient {
       blocks.push({ type: 'divider' });
     }
     
-    // Executive Summary with collapsible "See more" formatting
-    // Show first ~300 chars, then truncate with "See more" link to full analysis
-    const summaryPreview = analysis.exec_summary.substring(0, 300);
-    const hasMoreSummary = analysis.exec_summary.length > 300;
+    // Executive Summary - strip markdown headers and format for Slack
+    // Remove markdown headers (#, ##, ###) and convert to plain text with bold
+    let summaryText = analysis.exec_summary
+      .replace(/^#+\s+/gm, '') // Remove # headers
+      .replace(/\*\*([^*]+)\*\*/g, '*$1*') // Convert **bold** to *bold*
+      .trim();
+    
+    // Extract just the key assessment content (skip the headers)
+    const contentMatch = summaryText.match(/Current Status[:\*\s]+(.+?)(?=\n\n|$)/s);
+    const summaryPreview = contentMatch ? contentMatch[1].trim() : summaryText.substring(0, 300);
     
     blocks.push({
       type: 'section',
       text: {
         type: 'mrkdwn',
-        text: `*📋 Executive Summary*\n${summaryPreview}${hasMoreSummary ? '...' : ''}`,
+        text: `*📋 Executive Summary*\n${summaryPreview.substring(0, 300)}${summaryPreview.length > 300 ? '...' : ''}`,
       },
     });
     
-    if (hasMoreSummary) {
-      blocks.push({
-        type: 'context',
-        elements: [
-          {
-            type: 'mrkdwn',
-            text: '_See file attachment below for complete summary_',
-          },
-        ],
-      });
-    }
+    blocks.push({
+      type: 'context',
+      elements: [
+        {
+          type: 'mrkdwn',
+          text: '_See file attachment below for complete analysis_',
+        },
+      ],
+    });
     
     blocks.push({ type: 'divider' });
     
-    // Next Steps / Recommendations (also truncated)
-    const nextStepsPreview = analysis.next_steps.substring(0, 500);
-    const hasMoreSteps = analysis.next_steps.length > 500;
+    // Next Steps / Recommendations - strip markdown formatting
+    let nextStepsText = analysis.next_steps
+      .replace(/^#+\s+/gm, '') // Remove headers
+      .replace(/\*\*([^*]+)\*\*/g, '*$1*') // Convert markdown bold to Slack bold
+      .trim();
+    
+    // Show first 2-3 action items
+    const lines = nextStepsText.split('\n').filter(l => l.trim());
+    const preview = lines.slice(0, 5).join('\n');
     
     blocks.push({
       type: 'section',
       text: {
         type: 'mrkdwn',
-        text: `*${isActiveDeal ? '🎯 Recommended Next Steps' : '💡 Key Learnings'}*\n${nextStepsPreview}${hasMoreSteps ? '...' : ''}`,
+        text: `*${isActiveDeal ? '🎯 Recommended Next Steps' : '💡 Key Learnings'}*\n${preview}${lines.length > 5 ? '\n...' : ''}`,
       },
     });
     
-    if (hasMoreSteps) {
+    if (lines.length > 5) {
       blocks.push({
         type: 'context',
         elements: [
