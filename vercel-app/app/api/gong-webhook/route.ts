@@ -119,8 +119,34 @@ export async function POST(request: NextRequest) {
       
       console.log(`[Gong Webhook] Interaction created for deal ${deal.id}`);
       
-      // TODO: Trigger analysis asynchronously
-      // For now, we'll rely on manual trigger or separate cron job
+      // Auto-trigger analysis after every 3 interactions
+      try {
+        const interactions = await (await import('@/lib/db/client')).getInteractionsForDeal(deal.id);
+        const manualEmails = await (await import('@/lib/db/client')).getManualEmailsForDeal(deal.id);
+        const totalInteractions = interactions.length + manualEmails.length;
+        
+        console.log(`[Gong Webhook] Deal ${deal.id} now has ${totalInteractions} total interactions`);
+        
+        // Trigger analysis every 3 interactions (3, 6, 9, etc.)
+        if (totalInteractions % 3 === 0 && totalInteractions > 0) {
+          console.log(`[Gong Webhook] Auto-triggering analysis (${totalInteractions} interactions)`);
+          
+          // Trigger async - don't wait for completion
+          fetch(`https://anrok-deal-analyzer.vercel.app/api/analyze-deal`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-API-Key': process.env.INTERNAL_API_KEY || '',
+            },
+            body: JSON.stringify({ dealId: deal.id }),
+          }).catch(err => {
+            console.error(`[Gong Webhook] Auto-analysis failed for ${deal.id}:`, err);
+          });
+        }
+      } catch (error) {
+        console.error('[Gong Webhook] Failed to check/trigger auto-analysis:', error);
+        // Don't fail webhook if auto-analysis fails
+      }
     }
     
     if (dealIds.length === 0 && crmIds.length === 0) {
