@@ -1,0 +1,28 @@
+{
+  "display_information": {
+    "name": "Anrok Deal Analyzer",
+    "description": "Automated deal analysis bot that posts insights from sales calls and emails",
+    "background_color": "#2c3e50"
+  },
+  "features": {
+    "bot_user": {
+      "display_name": "Anrok Deal Analyzer",
+      "always_online": true
+    }
+  },
+  "oauth_config": {
+    "scopes": {
+      "bot": [
+        "chat:write",
+        "files:write",
+        "channels:read"
+      ]
+    }
+  },
+  "settings": {
+    "org_deploy_enabled": false,
+    "socket_mode_enabled": false,
+    "token_rotation_enabled": false
+  }
+}
+
