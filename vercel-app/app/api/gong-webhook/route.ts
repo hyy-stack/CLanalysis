@@ -134,6 +134,19 @@ export async function POST(request: NextRequest) {
       
       console.log(`[Gong Webhook] Interaction created for deal ${deal.id}`);
       
+      // Enrich with emails from external participants (async - don't block webhook)
+      const externalParties = parties.filter((p: any) => p.affiliation === 'External');
+      if (externalParties.length > 0) {
+        console.log(`[Gong Webhook] Triggering email enrichment for ${externalParties.length} external parties`);
+        
+        // Run async - don't wait
+        import('@/lib/gong/emails').then(({ enrichDealWithEmails }) => {
+          enrichDealWithEmails(deal.id, callId, externalParties, gongClient).catch(err => {
+            console.error('[Gong Webhook] Email enrichment failed:', err);
+          });
+        });
+      }
+      
       // Auto-trigger analysis after every 3 interactions
       try {
         const interactions = await (await import('@/lib/db/client')).getInteractionsForDeal(deal.id);

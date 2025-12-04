@@ -142,6 +142,23 @@ export class GongClient {
   }
 
   /**
+   * Get email data for an email address
+   * Uses Gong's data privacy endpoint which includes emails
+   */
+  async getEmailsForAddress(emailAddress: string): Promise<any> {
+    const endpoint = `/v2/data-privacy/data-for-email-address`;
+    const params = new URLSearchParams({ emailAddress });
+    
+    try {
+      const response = await this.request<any>(`${endpoint}?${params}`);
+      return response;
+    } catch (error) {
+      console.error(`[Gong] Failed to fetch emails for ${emailAddress}:`, error);
+      return null;
+    }
+  }
+
+  /**
    * Get transcript for a specific call
    */
   async getCallTranscript(callId: string, callDate?: string): Promise<{ callTranscripts: GongTranscript[] }> {
