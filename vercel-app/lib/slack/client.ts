@@ -300,6 +300,29 @@ export class SlackClient {
   }
 
   /**
+   * Extract health score from analysis
+   */
+  private extractHealthScore(analysis: Analysis): number | null {
+    if (!analysis.details?.sections?.['Overall Deal Health Score']) {
+      return null;
+    }
+    
+    const scoreText = analysis.details.sections['Overall Deal Health Score'];
+    const match = scoreText.match(/(\d+)\/10/);
+    return match ? parseInt(match[1]) : null;
+  }
+
+  /**
+   * Get health indicator emoji (colored circle)
+   */
+  private getHealthIndicator(score: number): string {
+    if (score >= 8) return '🟢';
+    if (score >= 6) return '🟡';
+    if (score >= 4) return '🟠';
+    return '🔴';
+  }
+
+  /**
    * Get emoji for health score
    */
   private getScoreEmoji(score: number): string {
