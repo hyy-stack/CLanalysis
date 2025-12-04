@@ -1,4 +1,4 @@
-import { createPublicKey, verify } from 'crypto';
+import jwt from 'jsonwebtoken';
 
 /**
  * Gong webhook utilities
@@ -25,35 +25,20 @@ export function verifyGongWebhookJWT(
 ): boolean {
   try {
     // Remove "Bearer " prefix if present
-    const jwtToken = token.replace(/^Bearer\s+/, '');
+    const jwtToken = token.replace(/^Bearer\s+/, '').trim();
     
-    // Split JWT into parts
-    const parts = jwtToken.split('.');
-    if (parts.length !== 3) {
-      return false;
+    // Format public key with proper PEM headers if missing
+    let formattedKey = publicKey.trim();
+    if (!formattedKey.includes('-----BEGIN')) {
+      formattedKey = `-----BEGIN PUBLIC KEY-----\n${formattedKey}\n-----END PUBLIC KEY-----`;
     }
     
-    const [headerB64, payloadB64, signatureB64] = parts;
-    
-    // Verify signature
-    const signedData = `${headerB64}.${payloadB64}`;
-    const signature = Buffer.from(signatureB64, 'base64url');
-    
-    // Create public key object
-    const key = createPublicKey({
-      key: publicKey,
-      format: 'pem',
+    // Verify JWT
+    jwt.verify(jwtToken, formattedKey, {
+      algorithms: ['RS256'],
     });
     
-    // Verify with RSA
-    const isValid = verify(
-      'RSA-SHA256',
-      Buffer.from(signedData),
-      key,
-      signature
-    );
-    
-    return isValid;
+    return true;
   } catch (error) {
     console.error('[Gong] JWT verification error:', error);
     return false;
