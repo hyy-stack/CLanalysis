@@ -96,8 +96,21 @@ export class SlackClient {
     
     const threadTs = mainMessage.ts!;
     
+    console.log('[Slack] Main message posted, thread_ts:', threadTs);
+    
     // Post detailed analysis in thread
-    await this.postThreadedAnalysis(threadTs, analysis, deal);
+    try {
+      await this.postThreadedAnalysis(threadTs, analysis, deal);
+      console.log('[Slack] Thread details posted successfully');
+    } catch (error) {
+      console.error('[Slack] Failed to post thread details:', error);
+      // Post a simple fallback message
+      await this.client.chat.postMessage({
+        channel: this.channelId,
+        thread_ts: threadTs,
+        text: `Analysis complete but detailed view failed. Executive Summary: ${analysis.exec_summary.substring(0, 500)}`,
+      });
+    }
     
     console.log('[Slack] Analysis posted to thread:', threadTs);
     
@@ -173,32 +186,33 @@ export class SlackClient {
     });
     
     // Add action buttons
-    const actions: any[] = [
-      {
+    blocks.push({ type: 'divider' });
+    
+    const actions: any[] = [];
+    
+    // Add CRM link button
+    const crmUrl = this.getCrmUrl(deal.crm_id);
+    if (crmUrl) {
+      actions.push({
         type: 'button',
         text: {
           type: 'plain_text',
-          text: '📄 View Full Analysis',
+          text: '🔗 View in Salesforce',
         },
-        action_id: 'view_full_analysis',
-        value: analysis.id,
-      },
-    ];
-    
-    // Add CRM link if we have the CRM ID
-    if (deal.crm_id) {
-      const crmUrl = this.getCrmUrl(deal.crm_id);
-      if (crmUrl) {
-        actions.push({
-          type: 'button',
-          text: {
-            type: 'plain_text',
-            text: '🔗 View in CRM',
-          },
-          url: crmUrl,
-        });
-      }
+        url: crmUrl,
+        style: 'primary',
+      });
     }
+    
+    // Add view deal details button (API endpoint)
+    actions.push({
+      type: 'button',
+      text: {
+        type: 'plain_text',
+        text: '📊 View Deal Data',
+      },
+      url: `https://anrok-deal-analyzer.vercel.app/api/view-deal?crmId=${encodeURIComponent(deal.crm_id)}`,
+    });
     
     if (actions.length > 0) {
       blocks.push({
@@ -208,15 +222,20 @@ export class SlackClient {
     }
     
     // Post the formatted message
-    await this.client.chat.postMessage({
+    console.log('[Slack] Posting thread with', blocks.length, 'blocks');
+    
+    const threadMessage = await this.client.chat.postMessage({
       channel: this.channelId,
       thread_ts: threadTs,
       text: 'Analysis Details',
       blocks,
     });
     
+    console.log('[Slack] Thread message posted:', threadMessage.ts);
+    
     // Post full analysis as a file attachment
     if (analysis.details?.fullText) {
+      console.log('[Slack] Uploading full analysis file');
       await this.client.files.uploadV2({
         channel_id: this.channelId,
         thread_ts: threadTs,
@@ -225,6 +244,7 @@ export class SlackClient {
         title: '📊 Complete Analysis Report',
         initial_comment: '_Full detailed analysis with all sections_',
       });
+      console.log('[Slack] File uploaded');
     }
   }
 

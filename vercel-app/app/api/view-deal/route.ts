@@ -15,6 +15,9 @@ import {
  * Returns complete deal information with all interactions and analyses
  */
 
+// Mark as dynamic since we use searchParams
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
