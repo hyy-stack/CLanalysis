@@ -30,10 +30,17 @@ export class SlackClient {
   ): Promise<string> {
     console.log('[Slack] Posting analysis for deal:', deal.name);
     
-    // Determine emoji based on deal stage and analysis type
+    // Extract health score from analysis
+    const healthScore = this.extractHealthScore(analysis);
+    
+    // Determine emoji based on deal stage and health score
     let emoji = '📊';
     if (deal.stage === 'active' || deal.stage === 'in_progress') {
-      emoji = '🎯';
+      if (healthScore !== null) {
+        emoji = healthScore >= 7 ? '🟢' : healthScore >= 5 ? '🟡' : '🔴';
+      } else {
+        emoji = '🎯';
+      }
     } else if (deal.stage === 'closed_lost') {
       emoji = '📉';
     } else if (deal.stage === 'closed_won') {
@@ -51,7 +58,7 @@ export class SlackClient {
       },
     ];
     
-    // Add deal details in a nice section
+    // Add deal details with health score in main message
     const dealFields: any[] = [
       {
         type: 'mrkdwn',
@@ -63,10 +70,11 @@ export class SlackClient {
       },
     ];
     
-    if (deal.account_name) {
+    // Add health score to main message for active deals
+    if (healthScore !== null && (deal.stage === 'active' || deal.stage === 'in_progress')) {
       dealFields.push({
         type: 'mrkdwn',
-        text: `*Account*\n${deal.account_name}`,
+        text: `*Health Score*\n${this.getHealthIndicator(healthScore)} *${healthScore}/10* ${this.getRiskLevel(healthScore)}`,
       });
     }
     
@@ -89,7 +97,7 @@ export class SlackClient {
       elements: [
         {
           type: 'mrkdwn',
-          text: `🤖 Analysis completed ${new Date().toLocaleString()} | Click below to view details ⬇️`,
+          text: `🤖 Analysis completed ${new Date().toLocaleString()} | View thread for details ⬇️`,
         },
       ],
     });
@@ -177,25 +185,56 @@ export class SlackClient {
       blocks.push({ type: 'divider' });
     }
     
-    // Executive Summary with nice formatting
+    // Executive Summary with collapsible "See more" formatting
+    // Show first ~300 chars, then truncate with "See more" link to full analysis
+    const summaryPreview = analysis.exec_summary.substring(0, 300);
+    const hasMorSummary = analysis.exec_summary.length > 300;
+    
     blocks.push({
       type: 'section',
       text: {
         type: 'mrkdwn',
-        text: `*📋 Executive Summary*\n${this.truncate(analysis.exec_summary, 2500)}`,
+        text: `*📋 Executive Summary*\n${summaryPreview}${hasMoreSummary ? '...' : ''}`,
       },
     });
+    
+    if (hasMoreSummary) {
+      blocks.push({
+        type: 'context',
+        elements: [
+          {
+            type: 'mrkdwn',
+            text: '_See file attachment below for complete summary_',
+          },
+        ],
+      });
+    }
     
     blocks.push({ type: 'divider' });
     
-    // Next Steps / Recommendations
+    // Next Steps / Recommendations (also truncated)
+    const nextStepsPreview = analysis.next_steps.substring(0, 500);
+    const hasMoreSteps = analysis.next_steps.length > 500;
+    
     blocks.push({
       type: 'section',
       text: {
         type: 'mrkdwn',
-        text: `*${isActiveDeal ? '🎯 Recommended Next Steps' : '💡 Key Learnings'}*\n${this.truncate(analysis.next_steps, 2500)}`,
+        text: `*${isActiveDeal ? '🎯 Recommended Next Steps' : '💡 Key Learnings'}*\n${nextStepsPreview}${hasMoreSteps ? '...' : ''}`,
       },
     });
+    
+    if (hasMoreSteps) {
+      blocks.push({
+        type: 'context',
+        elements: [
+          {
+            type: 'mrkdwn',
+            text: '_See file attachment for all recommendations_',
+          },
+        ],
+      });
+    }
     
     // Add action buttons
     blocks.push({ type: 'divider' });
