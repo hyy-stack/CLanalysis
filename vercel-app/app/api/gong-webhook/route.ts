@@ -51,8 +51,12 @@ export async function POST(request: NextRequest) {
     
     console.log('[Gong Webhook] ✓ JWT signature verified');
     
+    // Log the actual payload structure
+    console.log('[Gong Webhook] Payload:', JSON.stringify(body, null, 2));
+    
     // Parse webhook payload
     const payload = parseGongWebhook(body);
+    console.log('[Gong Webhook] Parsed:', JSON.stringify(payload, null, 2));
     const { callId } = payload;
     
     // Check idempotency - if we've already processed this call, return success
