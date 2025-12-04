@@ -8,6 +8,10 @@
     "bot_user": {
       "display_name": "Anrok Deal Analyzer",
       "always_online": true
+    },
+    "interactivity": {
+      "is_enabled": true,
+      "request_url": "https://anrok-deal-analyzer.vercel.app/api/slack-interactions"
     }
   },
   "oauth_config": {

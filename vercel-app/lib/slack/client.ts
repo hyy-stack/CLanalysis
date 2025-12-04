@@ -91,14 +91,15 @@ export class SlackClient {
     // Add action buttons to main message
     const mainActions: any[] = [];
     
-    // View Deal Data button
+    // Show Interactions button (interactive - posts to thread when clicked)
     mainActions.push({
       type: 'button',
       text: {
         type: 'plain_text',
-        text: '📊 View Deal Data',
+        text: '📅 Show Interactions',
       },
-      url: `https://anrok-deal-analyzer.vercel.app/api/view-deal?crmId=${encodeURIComponent(deal.crm_id)}`,
+      action_id: 'show_interactions',
+      value: deal.id, // Pass deal ID so interaction handler can fetch data
     });
     
     // View in Salesforce button if applicable
