@@ -289,6 +289,86 @@ export class SlackClient {
   }
 
   /**
+   * Post interactions timeline in thread
+   */
+  private async postInteractionsTimeline(
+    threadTs: string,
+    interactions: any[],
+    manualEmails: any[]
+  ): Promise<void> {
+    // Combine all interactions
+    const allItems = [
+      ...interactions.map(i => ({
+        type: i.type === 'call' ? '📞 Call' : '📧 Email',
+        title: i.title || 'Untitled',
+        timestamp: new Date(i.timestamp),
+        duration: i.duration,
+      })),
+      ...manualEmails.map(e => ({
+        type: '📧 Email',
+        title: e.subject,
+        timestamp: new Date(e.timestamp),
+        duration: null,
+      })),
+    ];
+    
+    allItems.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+    
+    if (allItems.length === 0) return;
+    
+    // Build timeline text
+    const timeline = allItems.map((item, idx) => {
+      const date = item.timestamp.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      const time = item.timestamp.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+      let line = `${idx + 1}. ${item.type}: *${item.title}*\n    ${date} at ${time}`;
+      
+      if (item.duration) {
+        const minutes = Math.floor(item.duration / 60);
+        line += ` • ${minutes} min`;
+      }
+      
+      return line;
+    }).join('\n\n');
+    
+    // Count calls and emails
+    const calls = allItems.filter(i => i.type === '📞 Call').length;
+    const emails = allItems.filter(i => i.type === '📧 Email').length;
+    
+    await this.client.chat.postMessage({
+      channel: this.channelId,
+      thread_ts: threadTs,
+      text: 'Interaction Timeline',
+      blocks: [
+        {
+          type: 'header',
+          text: {
+            type: 'plain_text',
+            text: '📅 Interaction Timeline',
+          },
+        },
+        {
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: timeline,
+          },
+        },
+        {
+          type: 'context',
+          elements: [
+            {
+              type: 'mrkdwn',
+              text: `📊 Total: ${calls} call${calls !== 1 ? 's' : ''}, ${emails} email${emails !== 1 ? 's' : ''}`,
+            },
+          ],
+        },
+      ],
+    });
+    
+    console.log('[Slack] Interactions timeline posted');
+  }
+
+  /**
    * Format stage with emoji
    */
   private formatStage(stage: string): string {
