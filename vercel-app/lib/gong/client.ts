@@ -65,11 +65,41 @@ export class GongClient {
   }
 
   /**
-   * Get a specific call by ID
+   * Get a specific call by ID with full details including parties
    */
   async getCall(callId: string): Promise<{ call: GongCall }> {
-    const endpoint = `/v2/calls/${callId}`;
-    return this.request(endpoint);
+    // Use POST to /v2/calls with contentSelector to get parties
+    const endpoint = `/v2/calls`;
+    
+    try {
+      const response = await this.request<any>(endpoint, {
+        method: 'POST',
+        body: JSON.stringify({
+          filter: {
+            callIds: [callId],
+          },
+          contentSelector: {
+            exposedFields: {
+              parties: true,
+              content: true,
+            },
+          },
+        }),
+      });
+      
+      // Extract the call from the response
+      if (response.calls && response.calls.length > 0) {
+        return { call: response.calls[0] };
+      }
+      
+      // Fallback to simple GET if POST doesn't work
+      const simpleEndpoint = `/v2/calls/${callId}`;
+      return this.request(simpleEndpoint);
+    } catch (error) {
+      // Fallback to simple GET
+      const simpleEndpoint = `/v2/calls/${callId}`;
+      return this.request(simpleEndpoint);
+    }
   }
 
   /**
