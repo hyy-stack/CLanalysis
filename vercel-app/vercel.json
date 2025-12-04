@@ -4,6 +4,9 @@
   "installCommand": "npm install",
   "framework": "nextjs",
   "functions": {
+    "app/api/analyze-deal/*.ts": {
+      "maxDuration": 300
+    },
     "app/api/**/*.ts": {
       "maxDuration": 60
     }
