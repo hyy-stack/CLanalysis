@@ -127,7 +127,7 @@ export async function POST(request: NextRequest) {
           title: call.title,
           timestamp: call.started || call.scheduled || new Date().toISOString(),
           duration: call.duration,
-          participants: call.parties || [],
+          participants: parties,
           source: 'gong_webhook',
         }
       );
@@ -175,7 +175,7 @@ export async function POST(request: NextRequest) {
           title: call.title,
           timestamp: call.started || call.scheduled || new Date().toISOString(),
           duration: call.duration,
-          participants: call.parties || [],
+          participants: parties,
           source: 'gong_webhook',
         }
       );
