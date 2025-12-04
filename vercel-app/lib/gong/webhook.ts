@@ -117,3 +117,57 @@ export function extractCrmIds(payload: GongWebhookPayload): string[] {
   return [];
 }
 
+/**
+ * Extract deal stages from webhook payload
+ * Returns array of stage names for all linked opportunities
+ */
+export function extractDealStages(payload: GongWebhookPayload): string[] {
+  const stages: string[] = [];
+  
+  if (!payload.metadata?.callData?.context) {
+    return stages;
+  }
+  
+  // Look through context for Salesforce opportunities
+  const contexts = payload.metadata.callData.context;
+  if (!Array.isArray(contexts)) return stages;
+  
+  for (const ctx of contexts) {
+    if (!ctx.objects || !Array.isArray(ctx.objects)) continue;
+    
+    for (const obj of ctx.objects) {
+      if (obj.objectType === 'Opportunity' && obj.fields) {
+        // Find StageName field
+        const stageField = obj.fields.find((f: any) => f.name === 'StageName');
+        if (stageField && stageField.value) {
+          stages.push(stageField.value);
+        }
+      }
+    }
+  }
+  
+  return stages;
+}
+
+/**
+ * Check if a stage is won or post-sales
+ * Customize this list based on your Salesforce stage names
+ */
+export function isWonOrPostSalesStage(stage: string): boolean {
+  const postSalesStages = [
+    'Closed Won',
+    'Closed - Won',
+    'Won',
+    'Onboarding',
+    'Live',
+    'Active Customer',
+    'Renewal',
+    'Expansion',
+    'Customer Success',
+  ];
+  
+  // Case-insensitive check
+  const stageLower = stage.toLowerCase();
+  return postSalesStages.some(ps => stageLower.includes(ps.toLowerCase()));
+}
+

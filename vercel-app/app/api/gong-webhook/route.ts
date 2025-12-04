@@ -66,8 +66,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ status: 'already_processed', callId });
     }
     
-    // Extract CRM opportunity IDs
+    // Extract CRM opportunity IDs and check deal stages
     const crmIds = extractCrmIds(payload);
+    
+    // Check if this is a post-sales/won deal we should skip
+    const dealStages = extractDealStages(payload);
+    const isPostSales = dealStages.some(stage => 
+      isWonOrPostSalesStage(stage)
+    );
+    
+    if (isPostSales) {
+      console.log(`[Gong Webhook] Skipping post-sales/won deal (stages: ${dealStages.join(', ')})`);
+      return NextResponse.json({ 
+        status: 'skipped', 
+        reason: 'post_sales_deal',
+        stages: dealStages 
+      });
+    }
     
     if (crmIds.length === 0) {
       console.log(`[Gong Webhook] No CRM IDs found for call ${callId}`);
