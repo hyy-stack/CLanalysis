@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { WebClient } from '@slack/web-api';
-import { getDealById, getInteractionsForDeal, getManualEmailsForDeal, getLatestAnalysis } from '@/lib/db/client';
+import { 
+  getDealById, 
+  getInteractionsForDeal, 
+  getManualEmailsForDeal, 
+  getLatestAnalysis,
+  getExcludedInteractionsForDeal,
+  excludeInteraction,
+  includeInteraction,
+} from '@/lib/db/client';
 
 /**
  * Slack Interactions Handler
@@ -75,6 +83,104 @@ export async function POST(request: NextRequest) {
         // Acknowledge the interaction
         return NextResponse.json({ ok: true });
       }
+      
+      if (action.action_id === 'exclude_interaction') {
+        // Exclude interaction from future analyses
+        const interactionId = action.value;
+        
+        await excludeInteraction(interactionId);
+        
+        // Update the message to show it's excluded
+        await slackClient.chat.update({
+          channel: payload.channel.id,
+          ts: payload.message.ts,
+          text: payload.message.text,
+          blocks: [
+            {
+              type: 'section',
+              text: {
+                type: 'mrkdwn',
+                text: `~${payload.message.text}~\n_Excluded from future analyses_`,
+              },
+            },
+          ],
+        });
+        
+        return NextResponse.json({ ok: true });
+      }
+      
+      if (action.action_id === 'include_interaction') {
+        // Re-include a previously excluded interaction
+        const interactionId = action.value;
+        
+        await includeInteraction(interactionId);
+        
+        // Fetch the interaction to get its details
+        const { sql } = await import('@vercel/postgres');
+        const result = await sql`SELECT * FROM interactions WHERE id = ${interactionId}`;
+        const interaction = result.rows[0];
+        
+        if (interaction) {
+          const type = interaction.type === 'call' ? '📞 Call' : '📧 Email';
+          const date = new Date(interaction.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+          const time = new Date(interaction.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+          let text = `${type}: *${interaction.title}*\n   ${date} at ${time}`;
+          
+          // Update message to show it's included again
+          await slackClient.chat.update({
+            channel: payload.channel.id,
+            ts: payload.message.ts,
+            text,
+            blocks: [
+              {
+                type: 'section',
+                text: {
+                  type: 'mrkdwn',
+                  text: `${text}\n_Re-included in analyses_`,
+                },
+              },
+            ],
+          });
+        }
+        
+        return NextResponse.json({ ok: true });
+      }
+      
+      if (action.action_id === 'show_excluded') {
+        // Show excluded interactions
+        const dealId = action.value;
+        const excluded = await getExcludedInteractionsForDeal(dealId);
+        
+        await postExcludedInteractions(
+          slackClient,
+          payload.channel.id,
+          payload.message.ts,
+          excluded
+        );
+        
+        return NextResponse.json({ ok: true });
+      }
+      
+      if (action.action_id === 'rerun_analysis') {
+        // Trigger new analysis for this deal
+        const dealId = action.value;
+        const deal = await getDealById(dealId);
+        
+        if (deal) {
+          // Call the analyze-deal endpoint
+          const baseUrl = process.env.VERCEL_URL 
+            ? `https://${process.env.VERCEL_URL}`
+            : 'https://anrok-deal-analyzer.vercel.app';
+          
+          await fetch(`${baseUrl}/api/analyze-deal`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ dealId: deal.id }),
+          });
+        }
+        
+        return NextResponse.json({ ok: true });
+      }
     }
     
     return NextResponse.json({ ok: true });
@@ -95,15 +201,17 @@ async function postInteractionsToThread(
   interactions: any[],
   manualEmails: any[]
 ) {
-  // Combine all interactions
+  // Combine all interactions with their IDs
   const allItems = [
     ...interactions.map(i => ({
+      id: i.id,
       type: i.type === 'call' ? '📞 Call' : '📧 Email',
       title: i.title || 'Untitled',
       timestamp: new Date(i.timestamp),
       duration: i.duration,
     })),
     ...manualEmails.map(e => ({
+      id: e.id,
       type: '📧 Email',
       title: e.subject,
       timestamp: new Date(e.timestamp),
@@ -122,20 +230,7 @@ async function postInteractionsToThread(
     return;
   }
   
-  // Build timeline
-  const timeline = allItems.map((item, idx) => {
-    const date = item.timestamp.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    const time = item.timestamp.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-    let line = `${idx + 1}. ${item.type}: *${item.title}*\n   ${date} at ${time}`;
-    
-    if (item.duration) {
-      const minutes = Math.floor(item.duration / 60);
-      line += ` • ${minutes} min`;
-    }
-    
-    return line;
-  }).join('\n\n');
-  
+  // Post header
   const calls = allItems.filter(i => i.type === '📞 Call').length;
   const emails = allItems.filter(i => i.type === '📧 Email').length;
   
@@ -152,13 +247,6 @@ async function postInteractionsToThread(
         },
       },
       {
-        type: 'section',
-        text: {
-          type: 'mrkdwn',
-          text: timeline,
-        },
-      },
-      {
         type: 'context',
         elements: [
           {
@@ -169,5 +257,138 @@ async function postInteractionsToThread(
       },
     ],
   });
+  
+  // Post each interaction as a separate message with exclude button
+  for (let idx = 0; idx < allItems.length; idx++) {
+    const item = allItems[idx];
+    const date = item.timestamp.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const time = item.timestamp.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    let text = `${idx + 1}. ${item.type}: *${item.title}*\n   ${date} at ${time}`;
+    
+    if (item.duration) {
+      const minutes = Math.floor(item.duration / 60);
+      text += ` • ${minutes} min`;
+    }
+    
+    await client.chat.postMessage({
+      channel,
+      thread_ts: threadTs,
+      text,
+      blocks: [
+        {
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text,
+          },
+          accessory: {
+            type: 'button',
+            text: {
+              type: 'plain_text',
+              text: '🗑️ Exclude',
+            },
+            action_id: 'exclude_interaction',
+            value: item.id,
+            style: 'danger',
+            confirm: {
+              title: {
+                type: 'plain_text',
+                text: 'Exclude from Analysis?',
+              },
+              text: {
+                type: 'mrkdwn',
+                text: 'This interaction will be excluded from future analyses. You can re-include it later.',
+              },
+              confirm: {
+                type: 'plain_text',
+                text: 'Exclude',
+              },
+              deny: {
+                type: 'plain_text',
+                text: 'Cancel',
+              },
+            },
+          },
+        },
+      ],
+    });
+  }
+}
+
+/**
+ * Post excluded interactions to thread
+ */
+async function postExcludedInteractions(
+  client: WebClient,
+  channel: string,
+  threadTs: string,
+  excludedInteractions: any[]
+) {
+  if (excludedInteractions.length === 0) {
+    await client.chat.postMessage({
+      channel,
+      thread_ts: threadTs,
+      text: 'No excluded interactions.',
+    });
+    return;
+  }
+  
+  // Post header
+  await client.chat.postMessage({
+    channel,
+    thread_ts: threadTs,
+    text: 'Excluded Interactions',
+    blocks: [
+      {
+        type: 'header',
+        text: {
+          type: 'plain_text',
+          text: '🗑️ Excluded Interactions',
+        },
+      },
+      {
+        type: 'context',
+        elements: [
+          {
+            type: 'mrkdwn',
+            text: `These ${excludedInteractions.length} interaction${excludedInteractions.length !== 1 ? 's are' : ' is'} excluded from analysis. Click to re-include.`,
+          },
+        ],
+      },
+    ],
+  });
+  
+  // Post each excluded interaction with include button
+  for (const interaction of excludedInteractions) {
+    const type = interaction.type === 'call' ? '📞 Call' : '📧 Email';
+    const date = new Date(interaction.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const time = new Date(interaction.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    const text = `~${type}: ${interaction.title}~\n   ${date} at ${time}`;
+    
+    await client.chat.postMessage({
+      channel,
+      thread_ts: threadTs,
+      text,
+      blocks: [
+        {
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text,
+          },
+          accessory: {
+            type: 'button',
+            text: {
+              type: 'plain_text',
+              text: '✅ Include',
+            },
+            action_id: 'include_interaction',
+            value: interaction.id,
+            style: 'primary',
+          },
+        },
+      ],
+    });
+  }
 }
 

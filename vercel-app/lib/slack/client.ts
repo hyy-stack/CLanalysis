@@ -30,6 +30,10 @@ export class SlackClient {
   ): Promise<string> {
     console.log('[Slack] Posting analysis for deal:', deal.name);
     
+    // Check for excluded interactions
+    const { getExcludedInteractionsForDeal } = await import('@/lib/db/client');
+    const excludedCount = (await getExcludedInteractionsForDeal(deal.id)).length;
+    
     // Extract health score from analysis
     const healthScore = this.extractHealthScore(analysis);
     
@@ -111,6 +115,48 @@ export class SlackClient {
       },
       action_id: 'download_full_analysis',
       value: deal.id,
+    });
+    
+    // Show Excluded Interactions button (only if there are excluded interactions)
+    if (excludedCount > 0) {
+      mainActions.push({
+        type: 'button',
+        text: {
+          type: 'plain_text',
+          text: `🗑️ Show Excluded (${excludedCount})`,
+        },
+        action_id: 'show_excluded',
+        value: deal.id,
+      });
+    }
+    
+    // Re-run Analysis button
+    mainActions.push({
+      type: 'button',
+      text: {
+        type: 'plain_text',
+        text: '🔄 Re-run Analysis',
+      },
+      action_id: 'rerun_analysis',
+      value: deal.id,
+      confirm: {
+        title: {
+          type: 'plain_text',
+          text: 'Re-run Analysis?',
+        },
+        text: {
+          type: 'mrkdwn',
+          text: 'This will create a new analysis thread with the current set of interactions.',
+        },
+        confirm: {
+          type: 'plain_text',
+          text: 'Re-run',
+        },
+        deny: {
+          type: 'plain_text',
+          text: 'Cancel',
+        },
+      },
     });
     
     // View in Salesforce button if applicable

@@ -104,15 +104,72 @@ export async function interactionExists(externalId: string): Promise<boolean> {
 
 /**
  * Get all interactions for a deal, sorted chronologically
+ * By default, excludes flagged interactions
  */
-export async function getInteractionsForDeal(dealId: string): Promise<Interaction[]> {
+export async function getInteractionsForDeal(dealId: string, includeExcluded: boolean = false): Promise<Interaction[]> {
+  let query;
+  
+  if (includeExcluded) {
+    query = sql`
+      SELECT * FROM interactions 
+      WHERE deal_id = ${dealId}
+      ORDER BY timestamp ASC
+    `;
+  } else {
+    query = sql`
+      SELECT * FROM interactions 
+      WHERE deal_id = ${dealId}
+      AND (metadata->>'excluded' IS NULL OR metadata->>'excluded' != 'true')
+      ORDER BY timestamp ASC
+    `;
+  }
+  
+  const result = await query;
+  return result.rows as Interaction[];
+}
+
+/**
+ * Get excluded interactions for a deal
+ */
+export async function getExcludedInteractionsForDeal(dealId: string): Promise<Interaction[]> {
   const result = await sql`
     SELECT * FROM interactions 
     WHERE deal_id = ${dealId}
+    AND metadata->>'excluded' = 'true'
     ORDER BY timestamp ASC
   `;
   
   return result.rows as Interaction[];
+}
+
+/**
+ * Exclude an interaction from future analyses
+ */
+export async function excludeInteraction(interactionId: string): Promise<void> {
+  await sql`
+    UPDATE interactions 
+    SET metadata = jsonb_set(
+      COALESCE(metadata, '{}'::jsonb),
+      '{excluded}',
+      'true'
+    )
+    WHERE id = ${interactionId}
+  `;
+}
+
+/**
+ * Include a previously excluded interaction
+ */
+export async function includeInteraction(interactionId: string): Promise<void> {
+  await sql`
+    UPDATE interactions 
+    SET metadata = jsonb_set(
+      COALESCE(metadata, '{}'::jsonb),
+      '{excluded}',
+      'false'
+    )
+    WHERE id = ${interactionId}
+  `;
 }
 
 /**
