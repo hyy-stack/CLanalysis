@@ -102,6 +102,17 @@ export class SlackClient {
       value: deal.id, // Pass deal ID so interaction handler can fetch data
     });
     
+    // Download Complete Report button (interactive - posts full analysis when clicked)
+    mainActions.push({
+      type: 'button',
+      text: {
+        type: 'plain_text',
+        text: '📥 Download Report',
+      },
+      action_id: 'download_full_analysis',
+      value: deal.id,
+    });
+    
     // View in Salesforce button if applicable
     const crmUrl = this.getCrmUrl(deal.crm_id);
     if (crmUrl) {
@@ -293,27 +304,7 @@ export class SlackClient {
     
     console.log('[Slack] Thread message posted:', threadMessage.ts);
     
-    // Post full analysis using plain text (Slack auto-adds "Show more" for text > 3000 chars)
-    if (analysis.details?.fullText) {
-      console.log('[Slack] Posting full analysis with auto-collapse');
-      
-      // Clean the markdown for Slack
-      const cleanedText = analysis.details.fullText
-        .replace(/^#+\s+/gm, '') // Remove markdown headers
-        .replace(/\*\*([^*]+)\*\*/g, '*$1*') // Convert **bold** to *bold*
-        .trim();
-      
-      // Post as simple text message - Slack will auto-add "Show more" if > 3000 chars
-      await this.client.chat.postMessage({
-        channel: this.channelId,
-        thread_ts: threadTs,
-        text: `📊 *Complete Analysis Report*\n\n${cleanedText}`,
-        unfurl_links: false,
-        unfurl_media: false,
-      });
-      
-      console.log('[Slack] Full analysis posted');
-    }
+    // Don't auto-post full analysis - user can click "Download Report" button to get it
   }
 
   /**
