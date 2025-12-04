@@ -43,6 +43,7 @@ export async function POST(request: NextRequest) {
       errors: [] as string[],
       dealId: '',
       dealName: '',
+      analysisTriggered: false,
     };
     
     let gongCalls: any[] = [];
