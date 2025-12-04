@@ -178,9 +178,12 @@ export async function includeInteraction(interactionId: string): Promise<void> {
 export async function excludeManualEmail(emailId: string): Promise<void> {
   await sql`
     UPDATE manual_emails
-    SET import_batch_id = COALESCE(import_batch_id, '') || '|EXCLUDED'
+    SET metadata = jsonb_set(
+      COALESCE(metadata, '{}'::jsonb),
+      '{excluded}',
+      'true'
+    )
     WHERE id = ${emailId}
-    AND import_batch_id NOT LIKE '%|EXCLUDED'
   `;
 }
 
@@ -190,7 +193,11 @@ export async function excludeManualEmail(emailId: string): Promise<void> {
 export async function includeManualEmail(emailId: string): Promise<void> {
   await sql`
     UPDATE manual_emails
-    SET import_batch_id = REPLACE(import_batch_id, '|EXCLUDED', '')
+    SET metadata = jsonb_set(
+      COALESCE(metadata, '{}'::jsonb),
+      '{excluded}',
+      'false'
+    )
     WHERE id = ${emailId}
   `;
 }
@@ -202,7 +209,7 @@ export async function getExcludedManualEmailsForDeal(dealId: string): Promise<Ma
   const result = await sql`
     SELECT * FROM manual_emails
     WHERE deal_id = ${dealId}
-    AND import_batch_id LIKE '%|EXCLUDED'
+    AND metadata->>'excluded' = 'true'
     ORDER BY timestamp ASC
   `;
   
@@ -226,7 +233,7 @@ export async function getManualEmailsForDeal(dealId: string, includeExcluded: bo
     query = sql`
       SELECT * FROM manual_emails
       WHERE deal_id = ${dealId}
-      AND (import_batch_id IS NULL OR import_batch_id NOT LIKE '%|EXCLUDED')
+      AND (metadata->>'excluded' IS NULL OR metadata->>'excluded' != 'true')
       ORDER BY timestamp ASC
     `;
   }
