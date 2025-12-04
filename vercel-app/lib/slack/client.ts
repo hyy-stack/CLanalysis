@@ -327,18 +327,24 @@ export class SlackClient {
     
     console.log('[Slack] Thread message posted:', threadMessage.ts);
     
-    // Post full analysis as a file attachment
+    // Post full analysis as expandable text (not file) using Slack's text overflow
     if (analysis.details?.fullText) {
-      console.log('[Slack] Uploading full analysis file');
-      await this.client.files.uploadV2({
-        channel_id: this.channelId,
+      console.log('[Slack] Posting full analysis as expandable text');
+      
+      // Clean the markdown for Slack
+      const cleanedText = analysis.details.fullText
+        .replace(/^#+\s+/gm, '') // Remove markdown headers
+        .replace(/\*\*([^*]+)\*\*/g, '*$1*') // Convert **bold** to *bold*
+        .trim();
+      
+      // Slack automatically adds "Show more" for long text
+      await this.client.chat.postMessage({
+        channel: this.channelId,
         thread_ts: threadTs,
-        file: Buffer.from(analysis.details.fullText),
-        filename: `${deal.name.replace(/[^a-z0-9]/gi, '-')}-analysis.md`,
-        title: '📊 Complete Analysis Report',
-        initial_comment: '_Full detailed analysis with all sections_',
+        text: `📊 *Complete Analysis Report*\n\n${cleanedText}`,
       });
-      console.log('[Slack] File uploaded');
+      
+      console.log('[Slack] Full analysis posted');
     }
   }
 
