@@ -87,8 +87,10 @@ export async function POST(request: NextRequest) {
       if (action.action_id === 'exclude_interaction') {
         // Exclude interaction from future analyses
         const interactionId = action.value;
+        console.log('[Slack Interaction] Excluding interaction:', interactionId);
         
         await excludeInteraction(interactionId);
+        console.log('[Slack Interaction] Interaction excluded in DB');
         
         // Update the message to show it's excluded
         await slackClient.chat.update({
@@ -106,6 +108,7 @@ export async function POST(request: NextRequest) {
           ],
         });
         
+        console.log('[Slack Interaction] Message updated');
         return NextResponse.json({ ok: true });
       }
       
@@ -164,18 +167,30 @@ export async function POST(request: NextRequest) {
       if (action.action_id === 'rerun_analysis') {
         // Trigger new analysis for this deal
         const dealId = action.value;
+        console.log('[Slack Interaction] Re-running analysis for deal:', dealId);
+        
         const deal = await getDealById(dealId);
         
         if (deal) {
-          // Call the analyze-deal endpoint
-          const baseUrl = process.env.VERCEL_URL 
-            ? `https://${process.env.VERCEL_URL}`
-            : 'https://anrok-deal-analyzer.vercel.app';
+          console.log('[Slack Interaction] Found deal:', deal.name);
           
-          await fetch(`${baseUrl}/api/analyze-deal`, {
+          // Call the analyze-deal endpoint
+          const baseUrl = 'https://anrok-deal-analyzer.vercel.app';
+          
+          const response = await fetch(`${baseUrl}/api/analyze-deal`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ dealId: deal.id }),
+          });
+          
+          const result = await response.json();
+          console.log('[Slack Interaction] Analysis triggered:', result);
+          
+          // Post confirmation in thread
+          await slackClient.chat.postMessage({
+            channel: payload.channel.id,
+            thread_ts: payload.message.ts,
+            text: `🔄 Re-analysis triggered! Check the channel for the new analysis thread.`,
           });
         }
         
