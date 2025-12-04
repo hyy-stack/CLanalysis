@@ -185,26 +185,28 @@ export async function POST(request: NextRequest) {
         if (deal) {
           console.log('[Slack Interaction] Found deal:', deal.name);
           
-          // Call the analyze-deal endpoint
-          const baseUrl = 'https://anrok-deal-analyzer.vercel.app';
-          
-          const response = await fetch(`${baseUrl}/api/analyze-deal`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ dealId: deal.id }),
-          });
-          
-          const result = await response.json();
-          console.log('[Slack Interaction] Analysis triggered:', result);
-          
-          // Post confirmation in thread
+          // Post immediate confirmation (before triggering analysis)
           await slackClient.chat.postMessage({
             channel: payload.channel.id,
             thread_ts: payload.message.ts,
-            text: `🔄 Re-analysis triggered! Check the channel for the new analysis thread.`,
+            text: `🔄 Re-analysis started for ${deal.name}. New thread will appear shortly...`,
           });
+          
+          // Trigger analysis asynchronously (don't wait)
+          const baseUrl = 'https://anrok-deal-analyzer.vercel.app';
+          
+          fetch(`${baseUrl}/api/analyze-deal`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ dealId: deal.id }),
+          }).catch(err => {
+            console.error('[Slack Interaction] Analysis trigger failed:', err);
+          });
+          
+          console.log('[Slack Interaction] Analysis triggered async');
         }
         
+        // Return immediately (don't wait for analysis to complete)
         return NextResponse.json({ ok: true });
       }
     }
