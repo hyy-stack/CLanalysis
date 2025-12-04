@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GongClient } from '@/lib/gong/client';
-import { parseGongWebhook, extractCrmIds, verifyGongWebhook } from '@/lib/gong/webhook';
+import { parseGongWebhook, extractCrmIds, verifyGongWebhookJWT } from '@/lib/gong/webhook';
 import { uploadTranscript } from '@/lib/blob/storage';
 import { upsertDeal, createInteraction, interactionExists } from '@/lib/db/client';
 
@@ -42,7 +42,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
     }
     
-    const { verifyGongWebhookJWT } = await import('@/lib/gong/webhook');
     const isValid = verifyGongWebhookJWT(authHeader, gongPublicKey);
     
     if (!isValid) {
