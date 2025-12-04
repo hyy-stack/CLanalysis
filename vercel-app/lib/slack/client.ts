@@ -303,12 +303,16 @@ export class SlackClient {
    * Extract health score from analysis
    */
   private extractHealthScore(analysis: Analysis): number | null {
-    if (!analysis.details?.sections?.['Overall Deal Health Score']) {
-      return null;
+    // Try to find score in details.sections first
+    if (analysis.details?.sections?.['Overall Deal Health Score']) {
+      const scoreText = analysis.details.sections['Overall Deal Health Score'];
+      const match = scoreText.match(/(\d+)\/10/);
+      if (match) return parseInt(match[1]);
     }
     
-    const scoreText = analysis.details.sections['Overall Deal Health Score'];
-    const match = scoreText.match(/(\d+)\/10/);
+    // Fallback: look for score pattern in execSummary or full text
+    const textToSearch = analysis.details?.fullText || analysis.exec_summary || '';
+    const match = textToSearch.match(/Overall Deal Health Score:\s*(\d+)\/10/i);
     return match ? parseInt(match[1]) : null;
   }
 
