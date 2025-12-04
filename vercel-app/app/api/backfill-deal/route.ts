@@ -135,7 +135,12 @@ export async function POST(request: NextRequest) {
           call.started || call.scheduled
         );
         
-        const transcript = transcriptResponse.callTranscripts?.[0];
+        const gongTranscript = transcriptResponse.callTranscripts?.[0];
+        
+        // Parse Gong transcript into our format
+        const transcript = parseGongTranscript(gongTranscript, call.id);
+        
+        console.log(`[Backfill] Parsed ${transcript.turns.length} turns`);
         
         // Upload to Blob
         const blobUrl = await uploadTranscript(call.id, transcript);
@@ -213,5 +218,50 @@ export async function POST(request: NextRequest) {
       error: (error as Error).message,
     }, { status: 500 });
   }
+}
+
+/**
+ * Parse Gong transcript structure into our standard format
+ * Gong returns transcript as array of topic segments with nested sentences
+ */
+function parseGongTranscript(gongTranscript: any, callId: string): any {
+  const turns: any[] = [];
+  
+  if (!gongTranscript || !gongTranscript.transcript) {
+    return { callId, turns };
+  }
+  
+  // Gong transcript is an array of segments
+  const segments = Array.isArray(gongTranscript.transcript)
+    ? gongTranscript.transcript
+    : Object.values(gongTranscript.transcript);
+  
+  for (const segment of segments) {
+    if (!segment || typeof segment !== 'object') continue;
+    
+    const speakerId = segment.speakerId || 'Unknown';
+    const sentences = segment.sentences || [];
+    
+    for (const sentence of sentences) {
+      if (!sentence || typeof sentence !== 'object') continue;
+      
+      turns.push({
+        speaker: speakerId,
+        speakerId: speakerId,
+        speakerRole: 'other', // Role detection would need participant data
+        timestamp: sentence.start || 0,
+        text: sentence.text || '',
+      });
+    }
+  }
+  
+  return {
+    callId,
+    turns,
+    metadata: {
+      segmentCount: segments.length,
+      turnCount: turns.length,
+    },
+  };
 }
 
