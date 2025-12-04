@@ -149,43 +149,29 @@ export async function POST(request: NextRequest) {
       
       console.log(`[Gong Webhook] Interaction created for deal ${deal.id}`);
       
-      // Enrich with emails from external participants (async - don't block webhook)
-      const externalParties = parties.filter((p: any) => p.affiliation === 'External');
-      if (externalParties.length > 0) {
-        console.log(`[Gong Webhook] Triggering email enrichment for ${externalParties.length} external parties`);
-        
-        // Run async - don't wait
-        import('@/lib/gong/emails').then(({ enrichDealWithEmails }) => {
-          enrichDealWithEmails(deal.id, callId, externalParties, gongClient).catch(err => {
-            console.error('[Gong Webhook] Email enrichment failed:', err);
-          });
-        });
-      }
+      // Email enrichment disabled for now (data-privacy endpoint not working as expected)
+      // Can be re-enabled once we understand Gong's email API better
       
-      // Auto-trigger analysis after every 3 interactions
+      // Auto-trigger analysis after EVERY qualifying call
       try {
         const interactions = await (await import('@/lib/db/client')).getInteractionsForDeal(deal.id);
         const manualEmails = await (await import('@/lib/db/client')).getManualEmailsForDeal(deal.id);
         const totalInteractions = interactions.length + manualEmails.length;
         
         console.log(`[Gong Webhook] Deal ${deal.id} now has ${totalInteractions} total interactions`);
+        console.log(`[Gong Webhook] Auto-triggering analysis for ${deal.name}`);
         
-        // Trigger analysis every 3 interactions (3, 6, 9, etc.)
-        if (totalInteractions % 3 === 0 && totalInteractions > 0) {
-          console.log(`[Gong Webhook] Auto-triggering analysis (${totalInteractions} interactions)`);
-          
-          // Trigger async - don't wait for completion
-          fetch(`https://anrok-deal-analyzer.vercel.app/api/analyze-deal`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'X-Internal-Call': 'internal', // Mark as internal call to bypass API key
-            },
-            body: JSON.stringify({ dealId: deal.id }),
-          }).catch(err => {
-            console.error(`[Gong Webhook] Auto-analysis failed for ${deal.id}:`, err);
-          });
-        }
+        // Trigger analysis asynchronously for every call
+        fetch(`https://anrok-deal-analyzer.vercel.app/api/analyze-deal`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Internal-Call': 'internal', // Bypass API key for internal calls
+          },
+          body: JSON.stringify({ dealId: deal.id }),
+        }).catch(err => {
+          console.error(`[Gong Webhook] Auto-analysis failed for ${deal.id}:`, err);
+        });
       } catch (error) {
         console.error('[Gong Webhook] Failed to check/trigger auto-analysis:', error);
         // Don't fail webhook if auto-analysis fails
