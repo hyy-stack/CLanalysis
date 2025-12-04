@@ -68,12 +68,32 @@ export function verifyGongWebhookHMAC(
  * @returns Parsed payload
  */
 export function parseGongWebhook(body: any): GongWebhookPayload {
-  // Gong webhook structure (may need adjustment based on actual payload)
+  // Gong webhook has nested structure: callData.metaData for call info
+  const callData = body.callData || body;
+  const metaData = callData.metaData || callData;
+  
+  // Extract call ID from nested structure
+  const callId = metaData.id || body.callId || body.call_id;
+  
+  // Extract CRM opportunity IDs from context
+  const crmOpportunityIds: string[] = [];
+  if (callData.context && Array.isArray(callData.context)) {
+    for (const ctx of callData.context) {
+      if (ctx.objects && Array.isArray(ctx.objects)) {
+        for (const obj of ctx.objects) {
+          if (obj.objectType === 'Opportunity' && obj.objectId) {
+            crmOpportunityIds.push(obj.objectId);
+          }
+        }
+      }
+    }
+  }
+  
   return {
-    eventType: body.eventType || body.event_type,
-    callId: body.callId || body.call_id || body.id,
-    timestamp: body.timestamp || body.occurred_at || new Date().toISOString(),
-    crmOpportunityIds: body.crmOpportunityIds || body.crm_opportunity_ids || [],
+    eventType: body.eventType || 'call.processed',
+    callId,
+    timestamp: metaData.started || metaData.scheduled || new Date().toISOString(),
+    crmOpportunityIds,
     metadata: body,
   };
 }
