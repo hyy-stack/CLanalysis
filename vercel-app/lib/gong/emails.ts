@@ -52,8 +52,22 @@ export async function enrichDealWithEmails(
       // Store each email as an interaction
       for (const email of emails) {
         try {
+          // Generate stable email ID from content (for idempotency)
+          // Use email message ID if available, otherwise hash subject+timestamp+from
+          const emailId = email.messageId || 
+                         email.id || 
+                         `email-${hashEmailIdentifier(email.subject, email.timestamp, party.emailAddress)}`;
+          
+          // Check if this email already exists (idempotency)
+          const { interactionExists } = await import('@/lib/db/client');
+          const exists = await interactionExists(emailId);
+          
+          if (exists) {
+            console.log(`[Email Enrichment] Email already exists, skipping: ${email.subject}`);
+            continue;
+          }
+          
           // Upload email body to Blob
-          const emailId = `${callId}-${party.emailAddress}-${email.timestamp}`;
           const blobUrl = await uploadEmail(emailId, email.body || email.content || '');
           
           // Create interaction record
@@ -117,5 +131,16 @@ function extractEmailsFromContent(content: any): any[] {
   
   console.log('[Email Enrichment] Unknown content structure:', Object.keys(content));
   return [];
+}
+
+/**
+ * Generate a stable hash for email identification
+ * Used when email doesn't have a unique message ID
+ */
+function hashEmailIdentifier(subject: string, timestamp: string, from: string): string {
+  const crypto = require('crypto');
+  const hash = crypto.createHash('md5');
+  hash.update(`${subject}|${timestamp}|${from}`);
+  return hash.digest('hex');
 }
 
