@@ -220,3 +220,48 @@ export async function POST(request: NextRequest) {
   }
 }
 
+/**
+ * Parse Gong transcript structure into our standard format
+ * Gong returns transcript as array of topic segments with nested sentences
+ */
+function parseGongTranscript(gongTranscript: any, callId: string): any {
+  const turns: any[] = [];
+  
+  if (!gongTranscript || !gongTranscript.transcript) {
+    return { callId, turns };
+  }
+  
+  // Gong transcript is an array of segments
+  const segments = Array.isArray(gongTranscript.transcript)
+    ? gongTranscript.transcript
+    : Object.values(gongTranscript.transcript);
+  
+  for (const segment of segments) {
+    if (!segment || typeof segment !== 'object') continue;
+    
+    const speakerId = segment.speakerId || 'Unknown';
+    const sentences = segment.sentences || [];
+    
+    for (const sentence of sentences) {
+      if (!sentence || typeof sentence !== 'object') continue;
+      
+      turns.push({
+        speaker: speakerId,
+        speakerId: speakerId,
+        speakerRole: 'other',
+        timestamp: sentence.start || 0,
+        text: sentence.text || '',
+      });
+    }
+  }
+  
+  return {
+    callId,
+    turns,
+    metadata: {
+      segmentCount: segments.length,
+      turnCount: turns.length,
+    },
+  };
+}
+
