@@ -13,7 +13,7 @@ export default function Home() {
       </ul>
       
       <h2>Status</h2>
-      <p>System operational. Webhooks configured.</p>
+      <p>System operational. Webhooks configured. v1.1</p>
     </main>
   );
 }
