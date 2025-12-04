@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
       }
       
       if (action.action_id === 'download_full_analysis') {
-        // Post full analysis as markdown code block to thread
+        // Post full analysis as a snippet (code block) to thread
         const dealId = action.value;
         const deal = await getDealById(dealId);
         
@@ -60,11 +60,14 @@ export async function POST(request: NextRequest) {
           const analysis = await getLatestAnalysis(deal.id);
           
           if (analysis && analysis.details?.fullText) {
-            // Post as markdown code block (using Slack's snippet format)
-            await slackClient.chat.postMessage({
-              channel: payload.channel.id,
+            // Upload as snippet for code block rendering
+            await slackClient.files.uploadV2({
+              channel_id: payload.channel.id,
               thread_ts: payload.message.ts,
-              text: `📊 *Complete Analysis Report for ${deal.name}*\n\n\`\`\`\n${analysis.details.fullText}\n\`\`\``,
+              content: analysis.details.fullText,
+              filename: `${deal.name.replace(/[^a-z0-9]/gi, '-')}-analysis.md`,
+              snippet_type: 'markdown',
+              title: `📊 Complete Analysis Report for ${deal.name}`,
             });
           }
         }
