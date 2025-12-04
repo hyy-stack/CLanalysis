@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GongClient } from '@/lib/gong/client';
-import { parseGongWebhook, extractCrmIds, verifyGongWebhookJWT } from '@/lib/gong/webhook';
+import { parseGongWebhook, extractCrmIds, verifyGongWebhookJWT, extractDealStages, isWonOrPostSalesStage } from '@/lib/gong/webhook';
 import { uploadTranscript } from '@/lib/blob/storage';
 import { upsertDeal, createInteraction, interactionExists } from '@/lib/db/client';
 

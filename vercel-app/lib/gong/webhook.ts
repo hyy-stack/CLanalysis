@@ -152,6 +152,7 @@ export function extractDealStages(payload: GongWebhookPayload): string[] {
 /**
  * Check if a stage is won or post-sales
  * Customize this list based on your Salesforce stage names
+ * NOTE: Renewal and Expansion are INCLUDED (we analyze those)
  */
 export function isWonOrPostSalesStage(stage: string): boolean {
   const postSalesStages = [
@@ -161,9 +162,8 @@ export function isWonOrPostSalesStage(stage: string): boolean {
     'Onboarding',
     'Live',
     'Active Customer',
-    'Renewal',
-    'Expansion',
     'Customer Success',
+    // NOTE: Renewal and Expansion removed - we want to analyze those!
   ];
   
   // Case-insensitive check
