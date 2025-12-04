@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import { requireApiKey } from '@/lib/auth/api-key';
 import {
   getDealByCrmId,
   getDealById,
@@ -16,6 +17,7 @@ import { SlackClient } from '@/lib/slack/client';
  * POST /api/analyze-deal
  * 
  * Analyzes a deal with all its interactions using Claude
+ * Requires API key authentication
  */
 
 const AnalyzeRequestSchema = z.object({
@@ -28,6 +30,10 @@ const AnalyzeRequestSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
+    // Require API key for this endpoint
+    const authError = requireApiKey(request);
+    if (authError) return authError;
+    
     const body = await request.json();
     const { crmId, dealId, analysisType } = AnalyzeRequestSchema.parse(body);
     

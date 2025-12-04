@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { WebClient } from '@slack/web-api';
+import { verifySlackSignature } from '@/lib/slack/verify';
 import { 
   getDealById, 
   getInteractionsForDeal, 
@@ -23,6 +24,30 @@ import {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.text();
+    
+    // Verify Slack signature
+    const timestamp = request.headers.get('x-slack-request-timestamp') || '';
+    const signature = request.headers.get('x-slack-signature') || '';
+    
+    if (!timestamp || !signature) {
+      console.error('[Slack Interaction] Missing signature headers');
+      return NextResponse.json({ error: 'Missing authentication' }, { status: 401 });
+    }
+    
+    const signingSecret = process.env.SLACK_SIGNING_SECRET;
+    if (!signingSecret) {
+      console.error('[Slack Interaction] SLACK_SIGNING_SECRET not configured');
+      return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
+    }
+    
+    const isValid = verifySlackSignature(body, timestamp, signature, signingSecret);
+    
+    if (!isValid) {
+      console.error('[Slack Interaction] Invalid signature or expired timestamp');
+      return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
+    }
+    
+    console.log('[Slack Interaction] ✓ Signature verified');
     
     // Parse URL-encoded payload
     const params = new URLSearchParams(body);

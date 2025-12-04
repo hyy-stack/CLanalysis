@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GongClient } from '@/lib/gong/client';
-import { parseGongWebhook, extractCrmIds } from '@/lib/gong/webhook';
+import { parseGongWebhook, extractCrmIds, verifyGongWebhook } from '@/lib/gong/webhook';
 import { uploadTranscript } from '@/lib/blob/storage';
 import { upsertDeal, createInteraction, interactionExists } from '@/lib/db/client';
 
@@ -12,9 +12,36 @@ import { upsertDeal, createInteraction, interactionExists } from '@/lib/db/clien
  */
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    // Get raw body for signature verification
+    const rawBody = await request.text();
+    const body = JSON.parse(rawBody);
     
-    console.log('[Gong Webhook] Received webhook:', body);
+    console.log('[Gong Webhook] Received webhook');
+    
+    // Verify webhook signature
+    const signature = request.headers.get('x-gong-signature') || 
+                     request.headers.get('x-hub-signature-256') || 
+                     request.headers.get('x-gong-request-signature') || '';
+    
+    if (!signature) {
+      console.error('[Gong Webhook] No signature header found');
+      return NextResponse.json({ error: 'Missing signature' }, { status: 401 });
+    }
+    
+    const webhookSecret = process.env.GONG_WEBHOOK_SECRET;
+    if (!webhookSecret) {
+      console.error('[Gong Webhook] GONG_WEBHOOK_SECRET not configured');
+      return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
+    }
+    
+    const isValid = verifyGongWebhook(rawBody, signature, webhookSecret);
+    
+    if (!isValid) {
+      console.error('[Gong Webhook] Invalid signature');
+      return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
+    }
+    
+    console.log('[Gong Webhook] ✓ Signature verified');
     
     // Parse webhook payload
     const payload = parseGongWebhook(body);
