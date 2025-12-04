@@ -29,7 +29,14 @@ export async function enrichDealWithEmails(
       console.log(`[Email Enrichment] Fetching emails for ${party.emailAddress}`);
       
       // Fetch email data for this participant
-      const emailData = await gongClient.getEmailsForAddress(party.emailAddress);
+      let emailData;
+      try {
+        emailData = await gongClient.getEmailsForAddress(party.emailAddress);
+        console.log(`[Email Enrichment] API call completed for ${party.emailAddress}`);
+      } catch (apiError) {
+        console.error(`[Email Enrichment] API call failed for ${party.emailAddress}:`, apiError);
+        continue;
+      }
       
       console.log(`[Email Enrichment] Email data response:`, JSON.stringify(emailData)?.substring(0, 500));
       

@@ -149,12 +149,15 @@ export class GongClient {
     const endpoint = `/v2/data-privacy/data-for-email-address`;
     const params = new URLSearchParams({ emailAddress });
     
+    console.log(`[Gong Client] Calling ${endpoint}?${params}`);
+    
     try {
       const response = await this.request<any>(`${endpoint}?${params}`);
+      console.log(`[Gong Client] Response received, keys:`, response ? Object.keys(response) : 'null');
       return response;
     } catch (error) {
-      console.error(`[Gong] Failed to fetch emails for ${emailAddress}:`, error);
-      return null;
+      console.error(`[Gong Client] Failed to fetch emails for ${emailAddress}:`, error);
+      throw error; // Throw instead of returning null so we can see the error
     }
   }
 
