@@ -112,7 +112,11 @@ export async function POST(request: NextRequest) {
       call.started || call.scheduled
     );
     
-    const transcript = transcriptResponse.callTranscripts?.[0];
+    const gongTranscript = transcriptResponse.callTranscripts?.[0];
+    
+    // Parse Gong transcript into our format with turns
+    const transcript = parseGongTranscript(gongTranscript, callId);
+    console.log(`[Gong Webhook] Parsed ${transcript.turns.length} conversation turns`);
     
     // Upload transcript to Blob storage
     const blobUrl = await uploadTranscript(callId, transcript);
