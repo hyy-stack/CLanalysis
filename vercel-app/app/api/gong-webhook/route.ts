@@ -74,19 +74,22 @@ export async function POST(request: NextRequest) {
       // Still process the call, but with null deal_id
     }
     
-    // Fetch full call details from Gong API
+    // Use call data from webhook payload (already has everything we need!)
+    const call = body.callData?.metaData;
+    const parties = body.callData?.parties || [];
+    
+    if (!call || !call.id) {
+      console.error(`[Gong Webhook] Invalid call data in webhook`);
+      return NextResponse.json({ error: 'Invalid call data' }, { status: 400 });
+    }
+    
+    console.log(`[Gong Webhook] Call: ${call.title}, Parties: ${parties.length}`);
+    
+    // Initialize Gong client for transcript fetch
     const gongClient = new GongClient(
       process.env.GONG_ACCESS_KEY!,
       process.env.GONG_ACCESS_KEY_SECRET!
     );
-    
-    const callResponse = await gongClient.getCall(callId);
-    const call = callResponse.call;
-    
-    if (!call) {
-      console.error(`[Gong Webhook] Call ${callId} not found in Gong`);
-      return NextResponse.json({ error: 'Call not found' }, { status: 404 });
-    }
     
     // Fetch transcript
     const transcriptResponse = await gongClient.getCallTranscript(
