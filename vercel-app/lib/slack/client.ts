@@ -279,41 +279,7 @@ export class SlackClient {
       });
     }
     
-    // Add action buttons
-    blocks.push({ type: 'divider' });
-    
-    const actions: any[] = [];
-    
-    // Add CRM link button
-    const crmUrl = this.getCrmUrl(deal.crm_id);
-    if (crmUrl) {
-      actions.push({
-        type: 'button',
-        text: {
-          type: 'plain_text',
-          text: '🔗 View in Salesforce',
-        },
-        url: crmUrl,
-        style: 'primary',
-      });
-    }
-    
-    // Add view deal details button (API endpoint)
-    actions.push({
-      type: 'button',
-      text: {
-        type: 'plain_text',
-        text: '📊 View Deal Data',
-      },
-      url: `https://anrok-deal-analyzer.vercel.app/api/view-deal?crmId=${encodeURIComponent(deal.crm_id)}`,
-    });
-    
-    if (actions.length > 0) {
-      blocks.push({
-        type: 'actions',
-        elements: actions,
-      });
-    }
+    // No action buttons in thread - they're in the main message
     
     // Post the formatted message
     console.log('[Slack] Posting thread with', blocks.length, 'blocks');
