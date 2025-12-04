@@ -103,15 +103,20 @@ export async function POST(request: NextRequest) {
         process.env.SLACK_CHANNEL_ID!
       );
       
-      slackThreadTs = await slackClient.postAnalysis(deal, {
-        ...analysisResult,
-        id: '', // Will be set after DB insert
-        deal_id: deal.id,
-        analysis_type: dbAnalysisType,
-        exec_summary: analysisResult.execSummary,
-        next_steps: analysisResult.nextSteps,
-        created_at: new Date(),
-      });
+      slackThreadTs = await slackClient.postAnalysis(
+        deal, 
+        {
+          ...analysisResult,
+          id: '', // Will be set after DB insert
+          deal_id: deal.id,
+          analysis_type: dbAnalysisType,
+          exec_summary: analysisResult.execSummary,
+          next_steps: analysisResult.nextSteps,
+          created_at: new Date(),
+        },
+        interactions, // Pass interactions
+        manualEmails // Pass emails
+      );
       
       slackChannel = process.env.SLACK_CHANNEL_ID!;
       

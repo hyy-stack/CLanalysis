@@ -18,9 +18,16 @@ export class SlackClient {
    * Post analysis to Slack channel with threaded details
    * @param deal - The deal being analyzed
    * @param analysis - The analysis results
+   * @param interactions - All interactions (calls/emails) for context
+   * @param manualEmails - Manual emails for context
    * @returns Slack message timestamp
    */
-  async postAnalysis(deal: Deal, analysis: Analysis): Promise<string> {
+  async postAnalysis(
+    deal: Deal, 
+    analysis: Analysis,
+    interactions: any[] = [],
+    manualEmails: any[] = []
+  ): Promise<string> {
     console.log('[Slack] Posting analysis for deal:', deal.name);
     
     // Determine emoji based on deal stage and analysis type
@@ -102,6 +109,11 @@ export class SlackClient {
     try {
       await this.postThreadedAnalysis(threadTs, analysis, deal);
       console.log('[Slack] Thread details posted successfully');
+      
+      // Post interactions timeline if available
+      if (interactions.length > 0 || manualEmails.length > 0) {
+        await this.postInteractionsTimeline(threadTs, interactions, manualEmails);
+      }
     } catch (error) {
       console.error('[Slack] Failed to post thread details:', error);
       // Post a simple fallback message
