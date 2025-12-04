@@ -188,7 +188,7 @@ export class SlackClient {
     // Executive Summary with collapsible "See more" formatting
     // Show first ~300 chars, then truncate with "See more" link to full analysis
     const summaryPreview = analysis.exec_summary.substring(0, 300);
-    const hasMorSummary = analysis.exec_summary.length > 300;
+    const hasMoreSummary = analysis.exec_summary.length > 300;
     
     blocks.push({
       type: 'section',
