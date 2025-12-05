@@ -93,15 +93,6 @@ export async function POST(request: NextRequest) {
       });
     }
     
-    // Check if this is only an onboarding manager call
-    if (isOnlyOnboardingManager(parties)) {
-      console.log(`[Gong Webhook] Skipping onboarding manager call`);
-      return NextResponse.json({
-        status: 'skipped',
-        reason: 'onboarding_call',
-      });
-    }
-    
     if (crmIds.length === 0) {
       console.log(`[Gong Webhook] No CRM IDs found for call ${callId}`);
       // Still process the call, but with null deal_id
@@ -110,6 +101,15 @@ export async function POST(request: NextRequest) {
     // Use call data from webhook payload (already has everything we need!)
     const call = body.callData?.metaData;
     const parties = body.callData?.parties || [];
+    
+    // Check if this is only an onboarding manager call (after parties is defined)
+    if (isOnlyOnboardingManager(parties)) {
+      console.log(`[Gong Webhook] Skipping onboarding manager call`);
+      return NextResponse.json({
+        status: 'skipped',
+        reason: 'onboarding_call',
+      });
+    }
     
     if (!call || !call.id) {
       console.error(`[Gong Webhook] Invalid call data in webhook`);
