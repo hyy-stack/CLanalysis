@@ -176,22 +176,24 @@ export function isWonOrPostSalesStage(stage: string): boolean {
 }
 
 /**
- * Check if call has only onboarding manager as internal participant
+ * Check if ALL internal participants are onboarding managers
  * Indicates it's an onboarding/CS call, not a sales call
  */
 export function isOnlyOnboardingManager(parties: any[]): boolean {
   const internalParties = parties.filter((p: any) => p.affiliation === 'Internal');
   
-  // If no internal parties or more than one internal person, not onboarding-only
-  if (internalParties.length === 0 || internalParties.length > 1) {
+  // If no internal parties, don't skip
+  if (internalParties.length === 0) {
     return false;
   }
   
-  // Check if the single internal person is an onboarding manager
-  const party = internalParties[0];
-  const title = (party.title || '').toLowerCase();
+  // Check if ALL internal participants are onboarding managers
+  const allOnboarding = internalParties.every((party: any) => {
+    const title = (party.title || '').toLowerCase();
+    return title.includes('onboarding') && title.includes('manager');
+  });
   
-  return title.includes('onboarding') && title.includes('manager');
+  return allOnboarding;
 }
 
 /**
