@@ -171,3 +171,84 @@ export function isWonOrPostSalesStage(stage: string): boolean {
   return postSalesStages.some(ps => stageLower.includes(ps.toLowerCase()));
 }
 
+/**
+ * Check if call has only onboarding manager as internal participant
+ * Indicates it's an onboarding/CS call, not a sales call
+ */
+export function isOnlyOnboardingManager(parties: any[]): boolean {
+  const internalParties = parties.filter((p: any) => p.affiliation === 'Internal');
+  
+  // If no internal parties or more than one internal person, not onboarding-only
+  if (internalParties.length === 0 || internalParties.length > 1) {
+    return false;
+  }
+  
+  // Check if the single internal person is an onboarding manager
+  const party = internalParties[0];
+  const title = (party.title || '').toLowerCase();
+  
+  return title.includes('onboarding') && title.includes('manager');
+}
+
+/**
+ * Extract company name from webhook context
+ */
+export function extractCompanyName(payload: GongWebhookPayload): string | null {
+  if (!payload.metadata?.callData?.context) {
+    return null;
+  }
+  
+  const contexts = payload.metadata.callData.context;
+  if (!Array.isArray(contexts)) return null;
+  
+  for (const ctx of contexts) {
+    if (!ctx.objects || !Array.isArray(ctx.objects)) continue;
+    
+    for (const obj of ctx.objects) {
+      if (obj.objectType === 'Account' && obj.fields) {
+        const nameField = obj.fields.find((f: any) => f.name === 'Name');
+        if (nameField && nameField.value) {
+          return nameField.value;
+        }
+      }
+    }
+  }
+  
+  return null;
+}
+
+/**
+ * Extract opportunity record type from webhook context
+ */
+export function extractOpportunityRecordType(payload: GongWebhookPayload): string | null {
+  if (!payload.metadata?.callData?.context) {
+    return null;
+  }
+  
+  const contexts = payload.metadata.callData.context;
+  if (!Array.isArray(contexts)) return null;
+  
+  for (const ctx of contexts) {
+    if (!ctx.objects || !Array.isArray(ctx.objects)) continue;
+    
+    for (const obj of ctx.objects) {
+      if (obj.objectType === 'Opportunity' && obj.fields) {
+        const recordTypeField = obj.fields.find((f: any) => f.name === 'RecordTypeId');
+        const typeField = obj.fields.find((f: any) => f.name === 'Type');
+        
+        // Return Type field (New Business, Renewal, etc.) if available
+        if (typeField && typeField.value) {
+          return typeField.value;
+        }
+        
+        // Fallback to RecordTypeId
+        if (recordTypeField && recordTypeField.value) {
+          return recordTypeField.value;
+        }
+      }
+    }
+  }
+  
+  return null;
+}
+

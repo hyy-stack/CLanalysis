@@ -308,35 +308,20 @@ export class SlackClient {
     
     blocks.push({ type: 'divider' });
     
-    // Next Steps / Recommendations - strip markdown formatting
+    // Next Steps / Recommendations - show ALL of them (don't truncate)
     let nextStepsText = analysis.next_steps
       .replace(/^#+\s+/gm, '') // Remove headers
       .replace(/\*\*([^*]+)\*\*/g, '*$1*') // Convert markdown bold to Slack bold
       .trim();
     
-    // Show first 2-3 action items
-    const lines = nextStepsText.split('\n').filter(l => l.trim());
-    const preview = lines.slice(0, 5).join('\n');
-    
+    // Show full text (Slack will auto-collapse if > 3000 chars)
     blocks.push({
       type: 'section',
       text: {
         type: 'mrkdwn',
-        text: `*${isActiveDeal ? '🎯 Recommended Next Steps' : '💡 Key Learnings'}*\n${preview}${lines.length > 5 ? '\n...' : ''}`,
+        text: `*${isActiveDeal ? '🎯 Recommended Next Steps' : '💡 Key Learnings'}*\n${nextStepsText}`,
       },
     });
-    
-    if (lines.length > 5) {
-      blocks.push({
-        type: 'context',
-        elements: [
-          {
-            type: 'mrkdwn',
-            text: '_See file attachment for all recommendations_',
-          },
-        ],
-      });
-    }
     
     // No action buttons in thread - they're in the main message
     

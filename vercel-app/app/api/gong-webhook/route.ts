@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GongClient } from '@/lib/gong/client';
-import { parseGongWebhook, extractCrmIds, verifyGongWebhookJWT, extractDealStages, isWonOrPostSalesStage } from '@/lib/gong/webhook';
+import { 
+  parseGongWebhook, 
+  extractCrmIds, 
+  verifyGongWebhookJWT, 
+  extractDealStages, 
+  isWonOrPostSalesStage,
+  isOnlyOnboardingManager,
+  extractCompanyName,
+  extractOpportunityRecordType,
+} from '@/lib/gong/webhook';
 import { uploadTranscript } from '@/lib/blob/storage';
 import { upsertDeal, createInteraction, interactionExists } from '@/lib/db/client';
 
@@ -84,6 +93,15 @@ export async function POST(request: NextRequest) {
       });
     }
     
+    // Check if this is only an onboarding manager call
+    if (isOnlyOnboardingManager(parties)) {
+      console.log(`[Gong Webhook] Skipping onboarding manager call`);
+      return NextResponse.json({
+        status: 'skipped',
+        reason: 'onboarding_call',
+      });
+    }
+    
     if (crmIds.length === 0) {
       console.log(`[Gong Webhook] No CRM IDs found for call ${callId}`);
       // Still process the call, but with null deal_id
@@ -123,15 +141,24 @@ export async function POST(request: NextRequest) {
     
     console.log(`[Gong Webhook] Transcript uploaded to Blob: ${blobUrl}`);
     
+    // Extract company name and record type from payload
+    const companyName = extractCompanyName(payload);
+    const opportunityRecordType = extractOpportunityRecordType(payload);
+    
+    console.log(`[Gong Webhook] Company: ${companyName}, Record Type: ${opportunityRecordType}`);
+    
     // Process each CRM ID (a call can be associated with multiple opportunities)
     const dealIds: string[] = [];
     
     for (const crmId of crmIds) {
-      // Upsert deal
+      // Determine deal stage from webhook
+      const stageFromWebhook = dealStages[0] || 'active';
+      
+      // Upsert deal with company name and record type
       const deal = await upsertDeal(crmId, {
-        name: call.title || `Deal ${crmId}`,
-        stage: 'active', // Default stage, will be updated by CRM sync
-        accountName: call.title,
+        name: companyName || call.title || `Deal ${crmId}`,
+        stage: stageFromWebhook.toLowerCase().replace(/\s+/g, '_'),
+        accountName: companyName,
       });
       
       dealIds.push(deal.id);
