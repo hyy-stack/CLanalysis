@@ -76,8 +76,10 @@ export class SlackClient {
       },
     ];
     
-    // Add health score to main message for active deals
-    if (healthScore !== null && (deal.stage === 'active' || deal.stage === 'in_progress')) {
+    // Add health score to main message for non-closed deals
+    const isActiveDeal = !['closed_lost', 'closed_won', 'closed-lost', 'closed-won'].includes(deal.stage.toLowerCase());
+    
+    if (healthScore !== null && isActiveDeal) {
       dealFields.push({
         type: 'mrkdwn',
         text: `*Health Score*\n${this.getHealthIndicator(healthScore)} *${healthScore}/10* ${this.getRiskLevel(healthScore)}`,
@@ -516,4 +518,5 @@ export class SlackClient {
     }
   }
 }
+
 
