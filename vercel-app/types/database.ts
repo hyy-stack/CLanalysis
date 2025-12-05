@@ -10,6 +10,7 @@ export interface Deal {
   amount?: number;
   currency?: string;
   account_name?: string;
+  opportunity_type?: string;
   created_at: Date;
   updated_at: Date;
 }

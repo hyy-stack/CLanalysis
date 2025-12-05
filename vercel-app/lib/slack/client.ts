@@ -72,6 +72,10 @@ export class SlackClient {
       },
       {
         type: 'mrkdwn',
+        text: `*Type*\n${deal.opportunity_type || 'Unknown'}`,
+      },
+      {
+        type: 'mrkdwn',
         text: `*Value*\n${deal.amount ? `${deal.currency || '$'}${deal.amount.toLocaleString()}` : 'TBD'}`,
       },
     ];

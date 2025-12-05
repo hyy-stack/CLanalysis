@@ -159,6 +159,7 @@ export async function POST(request: NextRequest) {
         name: companyName || call.title || `Deal ${crmId}`,
         stage: stageFromWebhook.toLowerCase().replace(/\s+/g, '_'),
         accountName: companyName || undefined,
+        opportunityType: opportunityRecordType || undefined,
       });
       
       dealIds.push(deal.id);
