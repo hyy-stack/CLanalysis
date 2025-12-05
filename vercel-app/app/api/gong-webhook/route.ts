@@ -158,7 +158,7 @@ export async function POST(request: NextRequest) {
       const deal = await upsertDeal(crmId, {
         name: companyName || call.title || `Deal ${crmId}`,
         stage: stageFromWebhook.toLowerCase().replace(/\s+/g, '_'),
-        accountName: companyName,
+        accountName: companyName || undefined,
       });
       
       dealIds.push(deal.id);
