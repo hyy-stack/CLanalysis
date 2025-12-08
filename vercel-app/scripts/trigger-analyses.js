@@ -9,7 +9,7 @@ require('dotenv').config({ path: path.join(__dirname, '../.env.local') });
 const { sql } = require('@vercel/postgres');
 
 const DEAL_NAMES = [
-  'Sureify',
+  'The Lifetime Value Co. LLC.',
 ];
 
 async function findDealsByName(names) {

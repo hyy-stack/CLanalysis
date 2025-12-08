@@ -294,15 +294,46 @@ export class SlackClient {
       .replace(/\*\*([^*]+)\*\*/g, '*$1*') // Convert **bold** to *bold*
       .trim();
     
-    // Show full executive summary (no truncation)
-    // Slack will handle long text gracefully
-    blocks.push({
-      type: 'section',
-      text: {
-        type: 'mrkdwn',
-        text: `*📋 Executive Summary*\n${summaryText}`,
-      },
-    });
+    // Slack has a 3000 character limit per section block
+    // Split into multiple blocks if needed to show full summary
+    const MAX_BLOCK_TEXT = 2800; // Leave some buffer for the header text
+    const header = '*📋 Executive Summary*\n';
+    
+    if (summaryText.length <= MAX_BLOCK_TEXT) {
+      // Fits in one block
+      blocks.push({
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: `${header}${summaryText}`,
+        },
+      });
+    } else {
+      // Split into multiple blocks
+      // First block with header
+      blocks.push({
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: header + summaryText.substring(0, MAX_BLOCK_TEXT - header.length),
+        },
+      });
+      
+      // Additional blocks for remaining text
+      let remaining = summaryText.substring(MAX_BLOCK_TEXT - header.length);
+      while (remaining.length > 0) {
+        const chunk = remaining.substring(0, MAX_BLOCK_TEXT);
+        remaining = remaining.substring(MAX_BLOCK_TEXT);
+        
+        blocks.push({
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: chunk + (remaining.length > 0 ? '' : ''),
+          },
+        });
+      }
+    }
     
     blocks.push({
       type: 'context',
