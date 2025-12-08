@@ -229,12 +229,11 @@ A: Analysis fails gracefully, can retry manually later.
 
 **Issues with production app**:
 - Check Vercel logs
-- Review `DEPLOYMENT.md`
-- Review `TESTING.md`
+- Review [DEPLOYMENT.md](DEPLOYMENT.md)
+- Review [TESTING.md](TESTING.md)
 
 **Issues with local MVP**:
-- Check `README.md` in parent directory
-- Review local data in `data/` folder
+- The local MVP has been removed - all functionality is now in the production app
 
 ## Summary
 

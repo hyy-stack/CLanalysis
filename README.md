@@ -1,114 +1,237 @@
-# Anrok Closed/Lost Deal Analyzer
+# Anrok Deal Analyzer
 
-A TypeScript application that analyzes lost sales deals by pulling data from Gong and providing insights into customer conversations.
+A production-ready Vercel application that automatically analyzes sales deals by receiving Gong call webhooks, analyzing conversations with Claude AI, and posting insights to Slack.
 
-## Setup
+## Features
 
-1. Install dependencies:
-```bash
+- ✅ **Gong Webhook Integration** - Automatic call ingestion
+- ✅ **Email Import** - Manual email association with deals
+- ✅ **Claude AI Analysis** - Automated deal insights
+- ✅ **Slack Integration** - Threaded analysis posts
+- ✅ **Hybrid Storage** - Postgres for metadata, Blob for content
+- ✅ **Smart Prompts** - Different analysis for active vs. lost deals
+
+## Quick Start
+
+See **[docs/QUICKSTART.md](docs/QUICKSTART.md)** for a complete 30-minute deployment guide.
+
+### tl;dr
+
+\`\`\`bash
+cd vercel-app
 npm install
-```
-
-2. Configure Gong API credentials:
-   - Create a `.env` file in the project root
-   - Get your Gong API credentials from: Admin center > Settings > Ecosystem > API
-   - Add the following to your `.env` file:
-
-```bash
-# Gong API Credentials
-GONG_ACCESS_KEY=your_access_key_here
-GONG_ACCESS_KEY_SECRET=your_access_key_secret_here
-
-# Optional: Configure deal stages to filter
-DEAL_STAGES_TO_ANALYZE=closed_lost,stalled,no_decision
-
-# Data storage path (relative to project root)
-DATA_DIR=./data
-```
-
-3. Build the project (optional - you can use `tsx` to run directly):
-```bash
-npm run build
-```
-
-## Usage
-
-### Check current status
-```bash
-npm run dev status
-```
-
-### Sync data from Gong
-
-You can sync using either an **Account ID** (company) or **Deal ID** (specific opportunity).
-
-**By Account ID** (recommended - gets all calls with a customer):
-```bash
-npm run sync -- --account-id <your-account-id>
-```
-
-**By Deal ID** (specific opportunity):
-```bash
-npm run sync -- --deal-id <your-deal-id>
-```
-
-Example:
-```bash
-npm run sync -- --account-id 1234567890
-```
-
-**Need help finding IDs?** See `FINDING_IDS_IN_GONG.md` for a detailed guide.
-
-### Analyze synced deals
-
-Analyze a specific deal:
-```bash
-npm run analyze -- --deal-id <your-deal-id>
-```
-
-Analyze all synced deals:
-```bash
-npm run analyze -- --all
-```
-
-### What happens during analysis?
-
-The analysis engine will:
-1. Load your deal data and call transcripts
-2. Generate comprehensive analysis prompts based on the templates
-3. Save the prompts as markdown files in `data/analysis/`
-4. Create a summary report
-
-You then:
-1. Open the generated prompt files in your IDE
-2. Copy and paste them into your preferred LLM (GPT-4, Claude, etc.)
-3. Review the AI-generated insights to understand why deals were lost
+vercel deploy
+# Set up Postgres + Blob in Vercel dashboard
+# Add environment variables
+# Configure Gong webhook
+# Set up Slack bot
+\`\`\`
 
 ## Architecture
 
-- **Data Sources**: Extensible plugin system (currently supports Gong)
-- **Storage**: Local JSON files in `data/` directory
-- **Analysis**: Markdown-based prompts for flexible analysis
-- **CLI**: Simple command-line interface for sync and analysis
+**Hybrid Storage**:
+- **Vercel Postgres**: Deal metadata, relationships, analysis results
+- **Vercel Blob**: Call transcripts, email bodies
 
-## Project Structure
+**AI-Powered**:
+- **Claude 3.5 Sonnet**: Analyzes conversations
+- **Smart Prompts**: Different analysis for active vs. lost deals
+- **Structured Output**: Executive summary, next steps, details
 
-```
-├── src/
-│   ├── index.ts              # CLI entry point
-│   ├── config/               # Configuration management
-│   ├── datasources/          # Data source plugins
-│   ├── storage/              # Local storage operations
-│   ├── analysis/             # Analysis engine
-│   └── types/                # TypeScript types
-├── prompts/                  # Analysis prompt templates
-├── data/                     # Local data storage (gitignored)
-└── package.json
-```
+**Team Sharing**:
+- **Slack Threads**: Formatted analysis posts
+- **Automatic**: Posts after analysis completes
+- **Organized**: Main message + detailed thread
 
-## Requirements
+See **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** for technical details.
 
-- Node.js 18+
-- Gong Administrator access for API credentials
-- Gong permissions: Read calls, Read deals/opportunities
+## API Endpoints
 
+### POST /api/gong-webhook
+Receives Gong call webhooks automatically.
+
+**Webhook will**:
+- Store call transcript in Blob
+- Create/update deal records
+- Link call to CRM opportunities
+- Trigger analysis automatically
+
+### POST /api/import-emails
+Import emails manually.
+
+**Request**:
+\`\`\`json
+{
+  "emails": [
+    {
+      "crmId": "006PP00000OjGVqYAN",
+      "subject": "Re: Proposal questions",
+      "from": "customer@company.com",
+      "to": "sales@anrok.com",
+      "timestamp": "2025-11-15T10:00:00Z",
+      "body": "Email content here..."
+    }
+  ],
+  "triggerAnalysis": true
+}
+\`\`\`
+
+### POST /api/analyze-deal
+Trigger analysis for a specific deal.
+
+**Request**:
+\`\`\`json
+{
+  "crmId": "006PP00000OjGVqYAN"
+}
+\`\`\`
+
+**OR**:
+\`\`\`json
+{
+  "dealId": "uuid-here"
+}
+\`\`\`
+
+**Response**:
+- Executive summary
+- Next steps
+- Slack thread link
+- Analysis ID
+
+### POST /api/backfill-deal
+Backfill historical calls for a deal.
+
+**Request**:
+\`\`\`json
+{
+  "crmId": "006PP00000OjGVqYAN",
+  "callIds": ["6226038272614881523"],
+  "autoAnalyze": true
+}
+\`\`\`
+
+## File Structure
+
+\`\`\`
+vercel-app/
+├── app/api/          # API route handlers
+├── lib/              # Core business logic
+│   ├── db/           # Postgres operations
+│   ├── blob/         # Blob storage
+│   ├── claude/       # AI integration
+│   ├── slack/        # Slack posting
+│   ├── gong/         # Gong API + webhooks
+│   └── analysis/     # Context building
+├── prompts/          # Analysis prompts
+├── types/            # TypeScript types
+└── scripts/          # Database migrations
+\`\`\`
+
+## Documentation
+
+- 📖 **[docs/QUICKSTART.md](docs/QUICKSTART.md)** - 30-minute deployment guide
+- 📖 **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)** - Detailed deployment steps
+- 📖 **[docs/TESTING.md](docs/TESTING.md)** - How to test everything
+- 📖 **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** - Technical deep dive
+- 📖 **[docs/SECURITY_SETUP.md](docs/SECURITY_SETUP.md)** - Security configuration
+- 📖 **[docs/SLACK_SETUP.md](docs/SLACK_SETUP.md)** - Slack bot setup
+- 📖 **[docs/MIGRATION_GUIDE.md](docs/MIGRATION_GUIDE.md)** - Migration reference
+- 📖 **[docs/FINDING_IDS_IN_GONG.md](docs/FINDING_IDS_IN_GONG.md)** - Finding Gong IDs
+- 📖 **[docs/GONG_ACCESS_GUIDE.md](docs/GONG_ACCESS_GUIDE.md)** - Gong API access
+
+## Development
+
+\`\`\`bash
+cd vercel-app
+
+# Install dependencies
+npm install
+
+# Run locally
+npm run dev
+
+# Open http://localhost:3000
+
+# Run database migration
+npm run db:migrate
+\`\`\`
+
+## Testing
+
+### Test Gong Webhook
+
+\`\`\`bash
+curl -X POST http://localhost:3000/api/gong-webhook \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "callId": "test-call-id",
+    "eventType": "call.processed",
+    "crmOpportunityIds": ["006PP00000OjGVqYAN"]
+  }'
+\`\`\`
+
+### Test Email Import
+
+\`\`\`bash
+curl -X POST http://localhost:3000/api/import-emails \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "emails": [{
+      "crmId": "006PP00000OjGVqYAN",
+      "subject": "Test",
+      "from": "test@example.com",
+      "to": "sales@anrok.com",
+      "timestamp": "2025-12-01T10:00:00Z",
+      "body": "Test email body"
+    }]
+  }'
+\`\`\`
+
+### Test Analysis
+
+\`\`\`bash
+curl -X POST http://localhost:3000/api/analyze-deal \\
+  -H "Content-Type: application/json" \\
+  -d '{"crmId": "006PP00000OjGVqYAN"}'
+\`\`\`
+
+## Deployment
+
+\`\`\`bash
+# Deploy to production
+cd vercel-app
+vercel --prod
+
+# Set environment variables in Vercel dashboard
+
+# Run migration on production database
+vercel env pull
+npm run db:migrate
+\`\`\`
+
+See **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)** for detailed steps.
+
+## Current State
+
+✅ **Fully implemented** - All code complete  
+✅ **Ready to deploy** - Just needs Vercel + config  
+✅ **Production-ready** - Error handling, logging, security
+
+## Troubleshooting
+
+### Webhook not receiving calls
+- Check Gong webhook configuration
+- Verify webhook URL is correct
+- Check Vercel function logs
+
+### Analysis not posting to Slack
+- Verify Slack bot token
+- Check bot is in channel
+- Check Slack API logs
+
+### Database errors
+- Verify schema is created (\`npm run db:migrate\`)
+- Check Postgres connection in Vercel
+
+For more help, see the [documentation](docs/).

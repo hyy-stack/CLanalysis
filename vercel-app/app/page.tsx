@@ -9,7 +9,7 @@ export default function Home() {
         <li><code>POST /api/gong-webhook</code> - Receive Gong call webhooks</li>
         <li><code>POST /api/import-emails</code> - Import emails for deals</li>
         <li><code>POST /api/analyze-deal</code> - Trigger deal analysis</li>
-        <li><code>POST /api/post-to-slack</code> - Post analysis to Slack</li>
+        <li><code>POST /api/backfill-deal</code> - Backfill historical calls</li>
       </ul>
       
       <h2>Status</h2>
