@@ -193,16 +193,27 @@ export async function POST(request: NextRequest) {
         console.log(`[Gong Webhook] Deal ${deal.id} now has ${totalInteractions} total interactions`);
         console.log(`[Gong Webhook] Auto-triggering analysis for ${deal.name}`);
         
-        // Trigger analysis asynchronously for every call
-        fetch(`https://anrok-deal-analyzer.vercel.app/api/analyze-deal`, {
+        // Trigger analysis asynchronously with timeout and retry
+        const analyzeUrl = `https://anrok-deal-analyzer.vercel.app/api/analyze-deal`;
+        
+        // Don't wait for response - fire and forget with timeout
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 5000); // 5 second timeout for fetch
+        
+        fetch(analyzeUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'X-Internal-Call': 'internal', // Bypass API key for internal calls
+            'X-Internal-Call': 'internal',
           },
           body: JSON.stringify({ dealId: deal.id }),
-        }).catch(err => {
-          console.error(`[Gong Webhook] Auto-analysis failed for ${deal.id}:`, err);
+          signal: controller.signal,
+        })
+        .then(() => clearTimeout(timeout))
+        .catch(err => {
+          clearTimeout(timeout);
+          // Log but don't fail - analysis will still run even if we lose connection
+          console.log(`[Gong Webhook] Analysis trigger sent (may timeout, that's OK): ${err.message}`);
         });
       } catch (error) {
         console.error('[Gong Webhook] Failed to check/trigger auto-analysis:', error);
