@@ -30,11 +30,18 @@ const AnalyzeRequestSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
+    console.log('[Analysis] Request received');
+    
     // Require API key for this endpoint
     const authError = requireApiKey(request);
-    if (authError) return authError;
+    if (authError) {
+      console.error('[Analysis] Auth failed:', authError.status);
+      return authError;
+    }
     
     const body = await request.json();
+    console.log('[Analysis] Request body:', { crmId: body.crmId, dealId: body.dealId, analysisType: body.analysisType });
+    
     const { crmId, dealId, analysisType } = AnalyzeRequestSchema.parse(body);
     
     console.log('[Analysis] Starting analysis for:', crmId || dealId);
