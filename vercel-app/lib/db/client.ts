@@ -17,11 +17,12 @@ export async function upsertDeal(
     currency?: string;
     accountName?: string;
     opportunityType?: string;
+    ownerName?: string;
   }
 ): Promise<Deal> {
   const result = await sql`
-    INSERT INTO deals (crm_id, name, stage, amount, currency, account_name, opportunity_type)
-    VALUES (${crmId}, ${data.name}, ${data.stage}, ${data.amount || null}, ${data.currency || 'USD'}, ${data.accountName || null}, ${data.opportunityType || null})
+    INSERT INTO deals (crm_id, name, stage, amount, currency, account_name, opportunity_type, owner_name)
+    VALUES (${crmId}, ${data.name}, ${data.stage}, ${data.amount || null}, ${data.currency || 'USD'}, ${data.accountName || null}, ${data.opportunityType || null}, ${data.ownerName || null})
     ON CONFLICT (crm_id) 
     DO UPDATE SET
       name = EXCLUDED.name,
@@ -30,6 +31,7 @@ export async function upsertDeal(
       currency = COALESCE(EXCLUDED.currency, deals.currency),
       account_name = COALESCE(EXCLUDED.account_name, deals.account_name),
       opportunity_type = COALESCE(EXCLUDED.opportunity_type, deals.opportunity_type),
+      owner_name = COALESCE(EXCLUDED.owner_name, deals.owner_name),
       updated_at = NOW()
     RETURNING *
   `;

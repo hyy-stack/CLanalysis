@@ -258,3 +258,65 @@ export function extractOpportunityRecordType(payload: GongWebhookPayload): strin
   return null;
 }
 
+/**
+ * Extract deal owner (AE/AM name) from webhook context
+ * Tries Opportunity Owner_Role_Stamped__c field first, then primary internal participant
+ */
+export function extractDealOwner(payload: GongWebhookPayload): string | null {
+  // First try: Get from Opportunity Owner_Role_Stamped__c field
+  if (payload.metadata?.callData?.context) {
+    const contexts = payload.metadata.callData.context;
+    if (Array.isArray(contexts)) {
+      for (const ctx of contexts) {
+        if (!ctx.objects || !Array.isArray(ctx.objects)) continue;
+        
+        for (const obj of ctx.objects) {
+          if (obj.objectType === 'Opportunity' && obj.fields) {
+            // Try Owner_Role_Stamped__c first (e.g., "MM AE", "Account Manager")
+            const ownerRoleField = obj.fields.find((f: any) => f.name === 'Owner_Role_Stamped__c');
+            if (ownerRoleField && ownerRoleField.value) {
+              // This gives us the role, but we want the name
+              // Let's try to get the actual owner name from User object
+              const ownerIdField = obj.fields.find((f: any) => f.name === 'OwnerId');
+              if (ownerIdField && ownerIdField.value) {
+                // Look for User object with matching ID
+                for (const ctx2 of contexts) {
+                  if (!ctx2.objects || !Array.isArray(ctx2.objects)) continue;
+                  for (const obj2 of ctx2.objects) {
+                    if (obj2.objectType === 'User' && obj2.objectId === ownerIdField.value && obj2.fields) {
+                      const nameField = obj2.fields.find((f: any) => f.name === 'Name');
+                      if (nameField && nameField.value) {
+                        return nameField.value;
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  // Second try: Get primary internal participant from parties
+  if (payload.metadata?.callData?.parties) {
+    const parties = payload.metadata.callData.parties;
+    if (Array.isArray(parties)) {
+      // Find the primary user (has userId) or first internal participant
+      const primaryUser = parties.find((p: any) => p.affiliation === 'Internal' && p.userId);
+      if (primaryUser && primaryUser.name) {
+        return primaryUser.name;
+      }
+      
+      // Fallback to first internal participant
+      const firstInternal = parties.find((p: any) => p.affiliation === 'Internal');
+      if (firstInternal && firstInternal.name) {
+        return firstInternal.name;
+      }
+    }
+  }
+  
+  return null;
+}
+

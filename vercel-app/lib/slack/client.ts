@@ -70,6 +70,10 @@ export class SlackClient {
         type: 'mrkdwn',
         text: `*Stage*\n${this.formatStage(deal.stage)}`,
       },
+      ...(deal.owner_name ? [{
+        type: 'mrkdwn',
+        text: `*Owner*\n${deal.owner_name}`,
+      }] : []),
       {
         type: 'mrkdwn',
         text: `*Type*\n${deal.opportunity_type || 'Unknown'}`,
@@ -290,15 +294,13 @@ export class SlackClient {
       .replace(/\*\*([^*]+)\*\*/g, '*$1*') // Convert **bold** to *bold*
       .trim();
     
-    // Extract just the key assessment content (skip the headers)
-    const contentMatch = summaryText.match(/Current Status[:\*\s]+(.+?)(?=\n\n|$)/s);
-    const summaryPreview = contentMatch ? contentMatch[1].trim() : summaryText.substring(0, 300);
-    
+    // Show full executive summary (no truncation)
+    // Slack will handle long text gracefully
     blocks.push({
       type: 'section',
       text: {
         type: 'mrkdwn',
-        text: `*📋 Executive Summary*\n${summaryPreview.substring(0, 300)}${summaryPreview.length > 300 ? '...' : ''}`,
+        text: `*📋 Executive Summary*\n${summaryText}`,
       },
     });
     

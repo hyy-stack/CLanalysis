@@ -9,6 +9,7 @@ import {
   isOnlyOnboardingManager,
   extractCompanyName,
   extractOpportunityRecordType,
+  extractDealOwner,
 } from '@/lib/gong/webhook';
 import { uploadTranscript } from '@/lib/blob/storage';
 import { upsertDeal, createInteraction, interactionExists } from '@/lib/db/client';
@@ -141,11 +142,12 @@ export async function POST(request: NextRequest) {
     
     console.log(`[Gong Webhook] Transcript uploaded to Blob: ${blobUrl}`);
     
-    // Extract company name and record type from payload
+    // Extract company name, record type, and owner from payload
     const companyName = extractCompanyName(payload);
     const opportunityRecordType = extractOpportunityRecordType(payload);
+    const dealOwner = extractDealOwner(payload);
     
-    console.log(`[Gong Webhook] Company: ${companyName}, Record Type: ${opportunityRecordType}`);
+    console.log(`[Gong Webhook] Company: ${companyName}, Record Type: ${opportunityRecordType}, Owner: ${dealOwner || 'N/A'}`);
     
     // Process each CRM ID (a call can be associated with multiple opportunities)
     const dealIds: string[] = [];
@@ -154,12 +156,13 @@ export async function POST(request: NextRequest) {
       // Determine deal stage from webhook
       const stageFromWebhook = dealStages[0] || 'active';
       
-      // Upsert deal with company name and record type
+      // Upsert deal with company name, record type, and owner
       const deal = await upsertDeal(crmId, {
         name: companyName || call.title || `Deal ${crmId}`,
         stage: stageFromWebhook.toLowerCase().replace(/\s+/g, '_'),
         accountName: companyName || undefined,
         opportunityType: opportunityRecordType || undefined,
+        ownerName: dealOwner || undefined,
       });
       
       dealIds.push(deal.id);
