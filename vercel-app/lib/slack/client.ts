@@ -287,53 +287,6 @@ export class SlackClient {
       blocks.push({ type: 'divider' });
     }
     
-    // Executive Summary - strip markdown headers and format for Slack
-    // Remove markdown headers (#, ##, ###) and convert to plain text with bold
-    let summaryText = analysis.exec_summary
-      .replace(/^#+\s+/gm, '') // Remove # headers
-      .replace(/\*\*([^*]+)\*\*/g, '*$1*') // Convert **bold** to *bold*
-      .trim();
-    
-    // Slack has a 3000 character limit per section block
-    // If summary is long, post it as a separate message to avoid truncation
-    const MAX_BLOCK_TEXT = 2800; // Leave some buffer for the header text
-    const header = '*📋 Executive Summary*\n';
-    let summaryNeedsSeparatePost = false;
-    
-    if (summaryText.length <= MAX_BLOCK_TEXT) {
-      // Fits in one block - add to current message
-      blocks.push({
-        type: 'section',
-        text: {
-          type: 'mrkdwn',
-          text: `${header}${summaryText}`,
-        },
-      });
-    } else {
-      // Too long for a single block - will post as separate message(s) after main message
-      summaryNeedsSeparatePost = true;
-      // Add header block to current message
-      blocks.push({
-        type: 'section',
-        text: {
-          type: 'mrkdwn',
-          text: header + '_(Full summary posted below)_',
-        },
-      });
-    }
-    
-    blocks.push({
-      type: 'context',
-      elements: [
-        {
-          type: 'mrkdwn',
-          text: '_See file attachment below for complete analysis_',
-        },
-      ],
-    });
-    
-    blocks.push({ type: 'divider' });
-    
     // Next Steps / Recommendations - show ALL of them (don't truncate)
     let nextStepsText = analysis.next_steps
       .replace(/^#+\s+/gm, '') // Remove headers
@@ -351,7 +304,7 @@ export class SlackClient {
     
     // No action buttons in thread - they're in the main message
     
-    // Post the formatted message first
+    // Post the formatted message first (without executive summary)
     console.log('[Slack] Posting thread with', blocks.length, 'blocks');
     
     const threadMessage = await this.client.chat.postMessage({
@@ -363,38 +316,59 @@ export class SlackClient {
     
     console.log('[Slack] Thread message posted:', threadMessage.ts);
     
-    // If summary was too long, post it as separate message(s) now
-    if (summaryNeedsSeparatePost) {
-      // Slack message limit is 4000 chars per message, but section blocks are limited to 3000
-      // Post in chunks of 2800 chars per message to be safe
-      const MAX_MESSAGE_TEXT = 2800;
-      let remaining = summaryText;
-      let chunkNum = 1;
+    // Post Executive Summary as separate plain text message(s) to avoid any truncation
+    // Slack message limit is 4000 chars per message, so we'll split into chunks
+    let summaryText = analysis.exec_summary
+      .replace(/^#+\s+/gm, '') // Remove # headers
+      .replace(/\*\*([^*]+)\*\*/g, '*$1*') // Convert **bold** to *bold*
+      .trim();
+    
+    // Post header first
+    await this.client.chat.postMessage({
+      channel: this.channelId,
+      thread_ts: threadTs,
+      text: '*📋 Executive Summary*',
+      blocks: [
+        {
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: '*📋 Executive Summary*',
+          },
+        },
+      ],
+    });
+    
+    // Post summary in chunks of 2800 chars to ensure each section block fits within Slack's 3000 char limit
+    // Slack section blocks have a hard 3000 character limit, so we use 2800 to be safe
+    const MAX_BLOCK_TEXT = 2800;
+    let remaining = summaryText;
+    let chunkNum = 1;
+    
+    while (remaining.length > 0) {
+      const chunk = remaining.substring(0, MAX_BLOCK_TEXT);
+      remaining = remaining.substring(MAX_BLOCK_TEXT);
       
-      while (remaining.length > 0) {
-        const chunk = remaining.substring(0, MAX_MESSAGE_TEXT);
-        remaining = remaining.substring(MAX_MESSAGE_TEXT);
-        
-        await this.client.chat.postMessage({
-          channel: this.channelId,
-          thread_ts: threadTs,
-          text: `Executive Summary ${chunkNum > 1 ? `(part ${chunkNum})` : ''}`,
-          blocks: [
-            {
-              type: 'section',
-              text: {
-                type: 'mrkdwn',
-                text: chunk,
-              },
+      // Post each chunk as a separate message to avoid any truncation
+      await this.client.chat.postMessage({
+        channel: this.channelId,
+        thread_ts: threadTs,
+        text: chunkNum > 1 ? `Executive Summary (continued, part ${chunkNum})` : 'Executive Summary',
+        blocks: [
+          {
+            type: 'section',
+            text: {
+              type: 'mrkdwn',
+              text: chunk,
             },
-          ],
-        });
-        
-        chunkNum++;
-      }
+          },
+        ],
+      });
       
-      console.log('[Slack] Posted executive summary in', chunkNum - 1, 'separate message(s)');
+      chunkNum++;
     }
+    
+    console.log('[Slack] Posted executive summary in', chunkNum - 1, 'message(s), total length:', summaryText.length);
     
     // Don't auto-post full analysis - user can click "Download Report" button to get it
   }
