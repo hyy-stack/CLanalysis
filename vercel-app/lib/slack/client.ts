@@ -275,21 +275,30 @@ export class SlackClient {
       text: '*📋 Executive Summary*',
     });
     
-    // Post summary in chunks of 4000 chars (Slack message limit)
-    // Use plain text (no blocks) to avoid auto-collapse
-    const MAX_MESSAGE_TEXT = 4000;
+    // Post summary in chunks - Slack allows up to 40,000 chars, but we'll use 10,000 per chunk for reliability
+    // Use blocks with large text fields to ensure full content is displayed
+    const MAX_CHUNK_SIZE = 10000;
     let remaining = summaryText;
     let chunkNum = 1;
     
     while (remaining.length > 0) {
-      const chunk = remaining.substring(0, MAX_MESSAGE_TEXT);
-      remaining = remaining.substring(MAX_MESSAGE_TEXT);
+      const chunk = remaining.substring(0, MAX_CHUNK_SIZE);
+      remaining = remaining.substring(MAX_CHUNK_SIZE);
       
-      // Post as plain text message - no blocks, no truncation, no "See more"
+      // Use blocks with text field - this ensures full content is displayed without preview truncation
       await this.client.chat.postMessage({
         channel: this.channelId,
         thread_ts: threadTs,
-        text: chunk,
+        text: chunk.substring(0, 4000), // Fallback text (first 4000 chars)
+        blocks: [
+          {
+            type: 'section',
+            text: {
+              type: 'mrkdwn',
+              text: chunk, // Full chunk in block (up to 10,000 chars)
+            },
+          },
+        ],
       });
       
       chunkNum++;
@@ -336,20 +345,29 @@ export class SlackClient {
       text: nextStepsHeader,
     });
     
-    // Post Next Steps in chunks of 4000 chars (Slack message limit)
-    // Use plain text (no blocks) to avoid auto-collapse
+    // Post Next Steps in chunks - use blocks with large text fields
+    const MAX_CHUNK_SIZE = 10000;
     remaining = nextStepsText;
     chunkNum = 1;
     
     while (remaining.length > 0) {
-      const chunk = remaining.substring(0, MAX_MESSAGE_TEXT);
-      remaining = remaining.substring(MAX_MESSAGE_TEXT);
+      const chunk = remaining.substring(0, MAX_CHUNK_SIZE);
+      remaining = remaining.substring(MAX_CHUNK_SIZE);
       
-      // Post as plain text message - no blocks, no truncation, no "See more"
+      // Use blocks with text field - this ensures full content is displayed without preview truncation
       await this.client.chat.postMessage({
         channel: this.channelId,
         thread_ts: threadTs,
-        text: chunk,
+        text: chunk.substring(0, 4000), // Fallback text (first 4000 chars)
+        blocks: [
+          {
+            type: 'section',
+            text: {
+              type: 'mrkdwn',
+              text: chunk, // Full chunk in block (up to 10,000 chars)
+            },
+          },
+        ],
       });
       
       chunkNum++;
