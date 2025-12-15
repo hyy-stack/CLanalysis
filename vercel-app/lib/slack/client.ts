@@ -280,7 +280,7 @@ export class SlackClient {
     const MAX_BLOCK_TEXT = 2800; // Safe limit for section blocks
     const MAX_BLOCKS_PER_MESSAGE = 50; // Slack's block limit
     let remaining = summaryText;
-    let messageNum = 1;
+    let summaryMessageNum = 1;
     
     while (remaining.length > 0) {
       const blocks: any[] = [];
@@ -306,14 +306,14 @@ export class SlackClient {
       await this.client.chat.postMessage({
         channel: this.channelId,
         thread_ts: threadTs,
-        text: messageNum > 1 ? `Executive Summary (continued, part ${messageNum})` : 'Executive Summary',
+        text: summaryMessageNum > 1 ? `Executive Summary (continued, part ${summaryMessageNum})` : 'Executive Summary',
         blocks,
       });
       
-      messageNum++;
+      summaryMessageNum++;
     }
     
-    console.log('[Slack] Posted executive summary in', chunkNum - 1, 'message(s), total length:', summaryText.length);
+    console.log('[Slack] Posted executive summary in', summaryMessageNum - 1, 'message(s), total length:', summaryText.length);
     
     // 2. POST DEAL HEALTH SCORE (if available for active deals)
     if (healthScore !== null && isActiveDeal) {
@@ -355,10 +355,9 @@ export class SlackClient {
     });
     
     // Post Next Steps - split into multiple section blocks per message
-    const MAX_BLOCK_TEXT = 2800; // Safe limit for section blocks
-    const MAX_BLOCKS_PER_MESSAGE = 50; // Slack's block limit
+    // Reuse constants from above
     remaining = nextStepsText;
-    messageNum = 1;
+    let nextStepsMessageNum = 1;
     
     while (remaining.length > 0) {
       const blocks: any[] = [];
@@ -384,14 +383,14 @@ export class SlackClient {
       await this.client.chat.postMessage({
         channel: this.channelId,
         thread_ts: threadTs,
-        text: messageNum > 1 ? `${isActiveDeal ? 'Next Steps' : 'Key Learnings'} (continued, part ${messageNum})` : (isActiveDeal ? 'Next Steps' : 'Key Learnings'),
+        text: nextStepsMessageNum > 1 ? `${isActiveDeal ? 'Next Steps' : 'Key Learnings'} (continued, part ${nextStepsMessageNum})` : (isActiveDeal ? 'Next Steps' : 'Key Learnings'),
         blocks,
       });
       
-      messageNum++;
+      nextStepsMessageNum++;
     }
     
-    console.log('[Slack] Posted next steps in', chunkNum - 1, 'message(s), total length:', nextStepsText.length);
+    console.log('[Slack] Posted next steps in', nextStepsMessageNum - 1, 'message(s), total length:', nextStepsText.length);
     
     console.log('[Slack] Posted analysis thread: Executive Summary -> Deal Health -> Next Steps');
   }
