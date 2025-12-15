@@ -262,6 +262,7 @@ export class SlackClient {
     }
     
     // 1. POST EXECUTIVE SUMMARY FIRST (in chunks if needed)
+    // Use plain text messages to avoid Slack's "See more" auto-collapse behavior
     let summaryText = analysis.exec_summary
       .replace(/^#+\s+/gm, '') // Remove # headers
       .replace(/\*\*([^*]+)\*\*/g, '*$1*') // Convert **bold** to *bold*
@@ -271,41 +272,24 @@ export class SlackClient {
     await this.client.chat.postMessage({
       channel: this.channelId,
       thread_ts: threadTs,
-      text: '📋 Executive Summary',
-      blocks: [
-        {
-          type: 'section',
-          text: {
-            type: 'mrkdwn',
-            text: '*📋 Executive Summary*',
-          },
-        },
-      ],
+      text: '*📋 Executive Summary*',
     });
     
-    // Post summary in chunks of 2800 chars to ensure each section block fits within Slack's 3000 char limit
-    const MAX_BLOCK_TEXT = 2800;
+    // Post summary in chunks of 4000 chars (Slack message limit)
+    // Use plain text (no blocks) to avoid auto-collapse
+    const MAX_MESSAGE_TEXT = 4000;
     let remaining = summaryText;
     let chunkNum = 1;
     
     while (remaining.length > 0) {
-      const chunk = remaining.substring(0, MAX_BLOCK_TEXT);
-      remaining = remaining.substring(MAX_BLOCK_TEXT);
+      const chunk = remaining.substring(0, MAX_MESSAGE_TEXT);
+      remaining = remaining.substring(MAX_MESSAGE_TEXT);
       
-      // Post each chunk as a separate message - no truncation, full text visible
+      // Post as plain text message - no blocks, no truncation, no "See more"
       await this.client.chat.postMessage({
         channel: this.channelId,
         thread_ts: threadTs,
-        text: chunkNum > 1 ? `Executive Summary (continued, part ${chunkNum})` : 'Executive Summary',
-        blocks: [
-          {
-            type: 'section',
-            text: {
-              type: 'mrkdwn',
-              text: chunk,
-            },
-          },
-        ],
+        text: chunk,
       });
       
       chunkNum++;
@@ -338,74 +322,40 @@ export class SlackClient {
     }
     
     // 3. POST KEY LEARNINGS / NEXT STEPS LAST
+    // Use plain text messages to avoid Slack's "See more" auto-collapse behavior
     let nextStepsText = analysis.next_steps
       .replace(/^#+\s+/gm, '') // Remove headers
       .replace(/\*\*([^*]+)\*\*/g, '*$1*') // Convert markdown bold to Slack bold
       .trim();
     
-    // Post Next Steps in chunks if needed (no truncation)
+    // Post header
     const nextStepsHeader = `*${isActiveDeal ? '🎯 Recommended Next Steps' : '💡 Key Learnings'}*`;
+    await this.client.chat.postMessage({
+      channel: this.channelId,
+      thread_ts: threadTs,
+      text: nextStepsHeader,
+    });
     
-    // Check if we need to chunk next steps too
-    if (nextStepsText.length <= MAX_BLOCK_TEXT) {
-      // Fits in one block
+    // Post Next Steps in chunks of 4000 chars (Slack message limit)
+    // Use plain text (no blocks) to avoid auto-collapse
+    remaining = nextStepsText;
+    chunkNum = 1;
+    
+    while (remaining.length > 0) {
+      const chunk = remaining.substring(0, MAX_MESSAGE_TEXT);
+      remaining = remaining.substring(MAX_MESSAGE_TEXT);
+      
+      // Post as plain text message - no blocks, no truncation, no "See more"
       await this.client.chat.postMessage({
         channel: this.channelId,
         thread_ts: threadTs,
-        text: isActiveDeal ? 'Recommended Next Steps' : 'Key Learnings',
-        blocks: [
-          {
-            type: 'section',
-            text: {
-              type: 'mrkdwn',
-              text: `${nextStepsHeader}\n${nextStepsText}`,
-            },
-          },
-        ],
-      });
-    } else {
-      // Too long - post header first, then chunks
-      await this.client.chat.postMessage({
-        channel: this.channelId,
-        thread_ts: threadTs,
-        text: isActiveDeal ? 'Recommended Next Steps' : 'Key Learnings',
-        blocks: [
-          {
-            type: 'section',
-            text: {
-              type: 'mrkdwn',
-              text: nextStepsHeader,
-            },
-          },
-        ],
+        text: chunk,
       });
       
-      // Post chunks
-      remaining = nextStepsText;
-      chunkNum = 1;
-      
-      while (remaining.length > 0) {
-        const chunk = remaining.substring(0, MAX_BLOCK_TEXT);
-        remaining = remaining.substring(MAX_BLOCK_TEXT);
-        
-        await this.client.chat.postMessage({
-          channel: this.channelId,
-          thread_ts: threadTs,
-          text: chunkNum > 1 ? `${isActiveDeal ? 'Next Steps' : 'Key Learnings'} (continued, part ${chunkNum})` : (isActiveDeal ? 'Next Steps' : 'Key Learnings'),
-          blocks: [
-            {
-              type: 'section',
-              text: {
-                type: 'mrkdwn',
-                text: chunk,
-              },
-            },
-          ],
-        });
-        
-        chunkNum++;
-      }
+      chunkNum++;
     }
+    
+    console.log('[Slack] Posted next steps in', chunkNum - 1, 'message(s), total length:', nextStepsText.length);
     
     console.log('[Slack] Posted analysis thread: Executive Summary -> Deal Health -> Next Steps');
   }
