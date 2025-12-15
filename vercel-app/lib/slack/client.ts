@@ -275,33 +275,42 @@ export class SlackClient {
       text: '*📋 Executive Summary*',
     });
     
-    // Post summary in chunks - Slack allows up to 40,000 chars, but we'll use 10,000 per chunk for reliability
-    // Use blocks with large text fields to ensure full content is displayed
-    const MAX_CHUNK_SIZE = 10000;
+    // Post summary - split into multiple section blocks per message (each block max 3000 chars)
+    // Slack allows up to 50 blocks per message, so we can fit ~150k chars per message
+    const MAX_BLOCK_TEXT = 2800; // Safe limit for section blocks
+    const MAX_BLOCKS_PER_MESSAGE = 50; // Slack's block limit
     let remaining = summaryText;
-    let chunkNum = 1;
+    let messageNum = 1;
     
     while (remaining.length > 0) {
-      const chunk = remaining.substring(0, MAX_CHUNK_SIZE);
-      remaining = remaining.substring(MAX_CHUNK_SIZE);
+      const blocks: any[] = [];
+      let blocksInMessage = 0;
       
-      // Use blocks with text field - this ensures full content is displayed without preview truncation
+      // Fill message with as many blocks as possible (up to 50 blocks = ~140k chars)
+      while (remaining.length > 0 && blocksInMessage < MAX_BLOCKS_PER_MESSAGE) {
+        const chunk = remaining.substring(0, MAX_BLOCK_TEXT);
+        remaining = remaining.substring(MAX_BLOCK_TEXT);
+        
+        blocks.push({
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: chunk,
+          },
+        });
+        
+        blocksInMessage++;
+      }
+      
+      // Post message with multiple blocks
       await this.client.chat.postMessage({
         channel: this.channelId,
         thread_ts: threadTs,
-        text: chunk.substring(0, 4000), // Fallback text (first 4000 chars)
-        blocks: [
-          {
-            type: 'section',
-            text: {
-              type: 'mrkdwn',
-              text: chunk, // Full chunk in block (up to 10,000 chars)
-            },
-          },
-        ],
+        text: messageNum > 1 ? `Executive Summary (continued, part ${messageNum})` : 'Executive Summary',
+        blocks,
       });
       
-      chunkNum++;
+      messageNum++;
     }
     
     console.log('[Slack] Posted executive summary in', chunkNum - 1, 'message(s), total length:', summaryText.length);
@@ -345,32 +354,41 @@ export class SlackClient {
       text: nextStepsHeader,
     });
     
-    // Post Next Steps in chunks - use blocks with large text fields
-    const MAX_CHUNK_SIZE = 10000;
+    // Post Next Steps - split into multiple section blocks per message
+    const MAX_BLOCK_TEXT = 2800; // Safe limit for section blocks
+    const MAX_BLOCKS_PER_MESSAGE = 50; // Slack's block limit
     remaining = nextStepsText;
-    chunkNum = 1;
+    messageNum = 1;
     
     while (remaining.length > 0) {
-      const chunk = remaining.substring(0, MAX_CHUNK_SIZE);
-      remaining = remaining.substring(MAX_CHUNK_SIZE);
+      const blocks: any[] = [];
+      let blocksInMessage = 0;
       
-      // Use blocks with text field - this ensures full content is displayed without preview truncation
+      // Fill message with as many blocks as possible (up to 50 blocks = ~140k chars)
+      while (remaining.length > 0 && blocksInMessage < MAX_BLOCKS_PER_MESSAGE) {
+        const chunk = remaining.substring(0, MAX_BLOCK_TEXT);
+        remaining = remaining.substring(MAX_BLOCK_TEXT);
+        
+        blocks.push({
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: chunk,
+          },
+        });
+        
+        blocksInMessage++;
+      }
+      
+      // Post message with multiple blocks
       await this.client.chat.postMessage({
         channel: this.channelId,
         thread_ts: threadTs,
-        text: chunk.substring(0, 4000), // Fallback text (first 4000 chars)
-        blocks: [
-          {
-            type: 'section',
-            text: {
-              type: 'mrkdwn',
-              text: chunk, // Full chunk in block (up to 10,000 chars)
-            },
-          },
-        ],
+        text: messageNum > 1 ? `${isActiveDeal ? 'Next Steps' : 'Key Learnings'} (continued, part ${messageNum})` : (isActiveDeal ? 'Next Steps' : 'Key Learnings'),
+        blocks,
       });
       
-      chunkNum++;
+      messageNum++;
     }
     
     console.log('[Slack] Posted next steps in', chunkNum - 1, 'message(s), total length:', nextStepsText.length);
