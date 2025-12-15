@@ -197,15 +197,12 @@ export async function POST(request: NextRequest) {
         console.log(`[Gong Webhook] Auto-triggering analysis for ${deal.name} (dealId: ${deal.id})`);
         
         // Trigger analysis asynchronously - fire and forget
-        const analyzeUrl = `https://anrok-deal-analyzer.vercel.app/api/analyze-deal`;
+        // Don't await - let it run in background. Analysis endpoint handles its own timeout.
+        const analyzeUrl = `${process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://anrok-deal-analyzer.vercel.app'}/api/analyze-deal`;
         
-        // Use a longer timeout to ensure request reaches server (analysis itself runs async)
-        const controller = new AbortController();
-        const timeout = setTimeout(() => {
-          console.log(`[Gong Webhook] Fetch timeout (this is OK - analysis continues server-side)`);
-          controller.abort();
-        }, 30000); // 30 second timeout - enough for request to reach server
-        
+        // Fire and forget - no timeout needed since we're not awaiting
+        // The analysis endpoint will handle the actual processing asynchronously
+        // Use X-Internal-Call header to bypass API key requirement
         fetch(analyzeUrl, {
           method: 'POST',
           headers: {
@@ -213,22 +210,24 @@ export async function POST(request: NextRequest) {
             'X-Internal-Call': 'internal',
           },
           body: JSON.stringify({ dealId: deal.id }),
-          signal: controller.signal,
         })
         .then(response => {
-          clearTimeout(timeout);
           if (!response.ok) {
             console.error(`[Gong Webhook] Analysis endpoint returned ${response.status}: ${response.statusText}`);
             return response.text().then(text => {
-              console.error(`[Gong Webhook] Response body: ${text}`);
+              console.error(`[Gong Webhook] Response body: ${text.substring(0, 500)}`);
             });
           }
           console.log(`[Gong Webhook] ✓ Analysis trigger accepted by server (status ${response.status})`);
         })
         .catch(err => {
-          clearTimeout(timeout);
           // Log error but don't fail - analysis may still run server-side
-          console.error(`[Gong Webhook] Analysis trigger fetch error: ${err.message}`, err);
+          // This is fire-and-forget, so errors here are non-critical
+          if (err.name === 'AbortError') {
+            console.log(`[Gong Webhook] Analysis trigger aborted (this is OK - request was sent)`);
+          } else {
+            console.error(`[Gong Webhook] Analysis trigger fetch error: ${err.message}`, err);
+          }
         });
       } catch (error) {
         console.error('[Gong Webhook] Failed to check/trigger auto-analysis:', error);
