@@ -241,6 +241,7 @@ export class SlackClient {
 
   /**
    * Post detailed analysis in thread with enhanced Block Kit formatting
+   * Order: Executive Summary -> Deal Health -> Key Learnings/Next Steps
    */
   private async postThreadedAnalysis(
     threadTs: string,
@@ -251,83 +252,26 @@ export class SlackClient {
     
     // Extract health score if available
     let healthScore = null;
-    let healthColor = '#808080';
     
     if (analysis.details?.sections?.['Overall Deal Health Score']) {
       const scoreText = analysis.details.sections['Overall Deal Health Score'];
       const match = scoreText.match(/(\d+)\/10/);
       if (match) {
         healthScore = parseInt(match[1]);
-        // Color coding: 8-10 green, 6-7 yellow, 4-5 orange, 1-3 red
-        if (healthScore >= 8) healthColor = '#36a64f'; // green
-        else if (healthScore >= 6) healthColor = '#ffcc00'; // yellow
-        else if (healthScore >= 4) healthColor = '#ff9900'; // orange
-        else healthColor = '#ff0000'; // red
       }
     }
     
-    // Build enhanced blocks
-    const blocks: any[] = [];
-    
-    // Health score with color indicator (for active deals)
-    if (healthScore !== null) {
-      blocks.push({
-        type: 'section',
-        fields: [
-          {
-            type: 'mrkdwn',
-            text: `*Deal Health Score*\n:large_${this.getScoreEmoji(healthScore)}_square: *${healthScore}/10*`,
-          },
-          {
-            type: 'mrkdwn',
-            text: `*Risk Level*\n${this.getRiskLevel(healthScore)}`,
-          },
-        ],
-      });
-      blocks.push({ type: 'divider' });
-    }
-    
-    // Next Steps / Recommendations - show ALL of them (don't truncate)
-    let nextStepsText = analysis.next_steps
-      .replace(/^#+\s+/gm, '') // Remove headers
-      .replace(/\*\*([^*]+)\*\*/g, '*$1*') // Convert markdown bold to Slack bold
-      .trim();
-    
-    // Show full text (Slack will auto-collapse if > 3000 chars)
-    blocks.push({
-      type: 'section',
-      text: {
-        type: 'mrkdwn',
-        text: `*${isActiveDeal ? '🎯 Recommended Next Steps' : '💡 Key Learnings'}*\n${nextStepsText}`,
-      },
-    });
-    
-    // No action buttons in thread - they're in the main message
-    
-    // Post the formatted message first (without executive summary)
-    console.log('[Slack] Posting thread with', blocks.length, 'blocks');
-    
-    const threadMessage = await this.client.chat.postMessage({
-      channel: this.channelId,
-      thread_ts: threadTs,
-      text: 'Analysis Details',
-      blocks,
-    });
-    
-    console.log('[Slack] Thread message posted:', threadMessage.ts);
-    
-    // Post Executive Summary as separate plain text message(s) to avoid any truncation
-    // Slack message limit is 4000 chars per message, so we'll split into chunks
+    // 1. POST EXECUTIVE SUMMARY FIRST (in chunks if needed)
     let summaryText = analysis.exec_summary
       .replace(/^#+\s+/gm, '') // Remove # headers
       .replace(/\*\*([^*]+)\*\*/g, '*$1*') // Convert **bold** to *bold*
       .trim();
     
-    // Post header first
+    // Post Executive Summary header
     await this.client.chat.postMessage({
       channel: this.channelId,
       thread_ts: threadTs,
-      text: '*📋 Executive Summary*',
+      text: '📋 Executive Summary',
       blocks: [
         {
           type: 'section',
@@ -340,7 +284,6 @@ export class SlackClient {
     });
     
     // Post summary in chunks of 2800 chars to ensure each section block fits within Slack's 3000 char limit
-    // Slack section blocks have a hard 3000 character limit, so we use 2800 to be safe
     const MAX_BLOCK_TEXT = 2800;
     let remaining = summaryText;
     let chunkNum = 1;
@@ -349,7 +292,7 @@ export class SlackClient {
       const chunk = remaining.substring(0, MAX_BLOCK_TEXT);
       remaining = remaining.substring(MAX_BLOCK_TEXT);
       
-      // Post each chunk as a separate message to avoid any truncation
+      // Post each chunk as a separate message - no truncation, full text visible
       await this.client.chat.postMessage({
         channel: this.channelId,
         thread_ts: threadTs,
@@ -370,7 +313,101 @@ export class SlackClient {
     
     console.log('[Slack] Posted executive summary in', chunkNum - 1, 'message(s), total length:', summaryText.length);
     
-    // Don't auto-post full analysis - user can click "Download Report" button to get it
+    // 2. POST DEAL HEALTH SCORE (if available for active deals)
+    if (healthScore !== null && isActiveDeal) {
+      await this.client.chat.postMessage({
+        channel: this.channelId,
+        thread_ts: threadTs,
+        text: `Deal Health Score: ${healthScore}/10`,
+        blocks: [
+          {
+            type: 'section',
+            fields: [
+              {
+                type: 'mrkdwn',
+                text: `*Deal Health Score*\n:large_${this.getScoreEmoji(healthScore)}_square: *${healthScore}/10*`,
+              },
+              {
+                type: 'mrkdwn',
+                text: `*Risk Level*\n${this.getRiskLevel(healthScore)}`,
+              },
+            ],
+          },
+        ],
+      });
+    }
+    
+    // 3. POST KEY LEARNINGS / NEXT STEPS LAST
+    let nextStepsText = analysis.next_steps
+      .replace(/^#+\s+/gm, '') // Remove headers
+      .replace(/\*\*([^*]+)\*\*/g, '*$1*') // Convert markdown bold to Slack bold
+      .trim();
+    
+    // Post Next Steps in chunks if needed (no truncation)
+    const nextStepsHeader = `*${isActiveDeal ? '🎯 Recommended Next Steps' : '💡 Key Learnings'}*`;
+    
+    // Check if we need to chunk next steps too
+    if (nextStepsText.length <= MAX_BLOCK_TEXT) {
+      // Fits in one block
+      await this.client.chat.postMessage({
+        channel: this.channelId,
+        thread_ts: threadTs,
+        text: isActiveDeal ? 'Recommended Next Steps' : 'Key Learnings',
+        blocks: [
+          {
+            type: 'section',
+            text: {
+              type: 'mrkdwn',
+              text: `${nextStepsHeader}\n${nextStepsText}`,
+            },
+          },
+        ],
+      });
+    } else {
+      // Too long - post header first, then chunks
+      await this.client.chat.postMessage({
+        channel: this.channelId,
+        thread_ts: threadTs,
+        text: isActiveDeal ? 'Recommended Next Steps' : 'Key Learnings',
+        blocks: [
+          {
+            type: 'section',
+            text: {
+              type: 'mrkdwn',
+              text: nextStepsHeader,
+            },
+          },
+        ],
+      });
+      
+      // Post chunks
+      remaining = nextStepsText;
+      chunkNum = 1;
+      
+      while (remaining.length > 0) {
+        const chunk = remaining.substring(0, MAX_BLOCK_TEXT);
+        remaining = remaining.substring(MAX_BLOCK_TEXT);
+        
+        await this.client.chat.postMessage({
+          channel: this.channelId,
+          thread_ts: threadTs,
+          text: chunkNum > 1 ? `${isActiveDeal ? 'Next Steps' : 'Key Learnings'} (continued, part ${chunkNum})` : (isActiveDeal ? 'Next Steps' : 'Key Learnings'),
+          blocks: [
+            {
+              type: 'section',
+              text: {
+                type: 'mrkdwn',
+                text: chunk,
+              },
+            },
+          ],
+        });
+        
+        chunkNum++;
+      }
+    }
+    
+    console.log('[Slack] Posted analysis thread: Executive Summary -> Deal Health -> Next Steps');
   }
 
   /**
