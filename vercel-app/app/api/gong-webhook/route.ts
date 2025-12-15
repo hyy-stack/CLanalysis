@@ -197,12 +197,11 @@ export async function POST(request: NextRequest) {
         console.log(`[Gong Webhook] Auto-triggering analysis for ${deal.name} (dealId: ${deal.id})`);
         
         // Trigger analysis asynchronously - fire and forget
-        // Don't await - let it run in background. Analysis endpoint handles its own timeout.
-        const analyzeUrl = `${process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://anrok-deal-analyzer.vercel.app'}/api/analyze-deal`;
+        // Use hardcoded production URL to avoid connection issues
+        const analyzeUrl = 'https://anrok-deal-analyzer.vercel.app/api/analyze-deal';
         
-        // Fire and forget - no timeout needed since we're not awaiting
-        // The analysis endpoint will handle the actual processing asynchronously
-        // Use X-Internal-Call header to bypass API key requirement
+        // Fire and forget - function may close before fetch completes (this is OK)
+        // Socket errors are expected when function ends before fetch completes
         fetch(analyzeUrl, {
           method: 'POST',
           headers: {
@@ -221,9 +220,15 @@ export async function POST(request: NextRequest) {
           console.log(`[Gong Webhook] ✓ Analysis trigger accepted by server (status ${response.status})`);
         })
         .catch(err => {
-          // Log error but don't fail - analysis may still run server-side
-          // This is fire-and-forget, so errors here are non-critical
-          if (err.name === 'AbortError') {
+          // Socket errors are expected in fire-and-forget scenarios when function ends early
+          // The request may still be processed server-side even if connection closes
+          const isSocketError = err.cause?.code === 'UND_ERR_SOCKET' || 
+                               err.message?.includes('other side closed') ||
+                               err.message?.includes('fetch failed');
+          
+          if (isSocketError) {
+            console.log(`[Gong Webhook] Analysis trigger initiated (connection closed early - this is OK)`);
+          } else if (err.name === 'AbortError') {
             console.log(`[Gong Webhook] Analysis trigger aborted (this is OK - request was sent)`);
           } else {
             console.error(`[Gong Webhook] Analysis trigger fetch error: ${err.message}`, err);
