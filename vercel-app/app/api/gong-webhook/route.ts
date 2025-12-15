@@ -199,41 +199,47 @@ export async function POST(request: NextRequest) {
         // Trigger analysis asynchronously - fire and forget
         // Use hardcoded production URL to avoid connection issues
         const analyzeUrl = 'https://anrok-deal-analyzer.vercel.app/api/analyze-deal';
+        const apiKey = process.env.INTERNAL_API_KEY;
         
-        // Fire and forget - function may close before fetch completes (this is OK)
-        // Socket errors are expected when function ends before fetch completes
-        fetch(analyzeUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Internal-Call': 'internal',
-          },
-          body: JSON.stringify({ dealId: deal.id }),
-        })
-        .then(response => {
-          if (!response.ok) {
-            console.error(`[Gong Webhook] Analysis endpoint returned ${response.status}: ${response.statusText}`);
-            return response.text().then(text => {
-              console.error(`[Gong Webhook] Response body: ${text.substring(0, 500)}`);
-            });
-          }
-          console.log(`[Gong Webhook] ✓ Analysis trigger accepted by server (status ${response.status})`);
-        })
-        .catch(err => {
-          // Socket errors are expected in fire-and-forget scenarios when function ends early
-          // The request may still be processed server-side even if connection closes
-          const isSocketError = err.cause?.code === 'UND_ERR_SOCKET' || 
-                               err.message?.includes('other side closed') ||
-                               err.message?.includes('fetch failed');
-          
-          if (isSocketError) {
-            console.log(`[Gong Webhook] Analysis trigger initiated (connection closed early - this is OK)`);
-          } else if (err.name === 'AbortError') {
-            console.log(`[Gong Webhook] Analysis trigger aborted (this is OK - request was sent)`);
-          } else {
-            console.error(`[Gong Webhook] Analysis trigger fetch error: ${err.message}`, err);
-          }
-        });
+        if (!apiKey) {
+          console.error('[Gong Webhook] INTERNAL_API_KEY not configured, cannot trigger analysis');
+        } else {
+          // Fire and forget - function may close before fetch completes (this is OK)
+          // Socket errors are expected when function ends before fetch completes
+          // Use API key to bypass Vercel password protection
+          fetch(analyzeUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-API-Key': apiKey,
+            },
+            body: JSON.stringify({ dealId: deal.id }),
+          })
+          .then(response => {
+            if (!response.ok) {
+              console.error(`[Gong Webhook] Analysis endpoint returned ${response.status}: ${response.statusText}`);
+              return response.text().then(text => {
+                console.error(`[Gong Webhook] Response body: ${text.substring(0, 500)}`);
+              });
+            }
+            console.log(`[Gong Webhook] ✓ Analysis trigger accepted by server (status ${response.status})`);
+          })
+          .catch(err => {
+            // Socket errors are expected in fire-and-forget scenarios when function ends early
+            // The request may still be processed server-side even if connection closes
+            const isSocketError = err.cause?.code === 'UND_ERR_SOCKET' || 
+                                 err.message?.includes('other side closed') ||
+                                 err.message?.includes('fetch failed');
+            
+            if (isSocketError) {
+              console.log(`[Gong Webhook] Analysis trigger initiated (connection closed early - this is OK)`);
+            } else if (err.name === 'AbortError') {
+              console.log(`[Gong Webhook] Analysis trigger aborted (this is OK - request was sent)`);
+            } else {
+              console.error(`[Gong Webhook] Analysis trigger fetch error: ${err.message}`, err);
+            }
+          });
+        }
       } catch (error) {
         console.error('[Gong Webhook] Failed to check/trigger auto-analysis:', error);
         // Don't fail webhook if auto-analysis fails
