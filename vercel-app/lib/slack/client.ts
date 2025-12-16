@@ -275,9 +275,10 @@ export class SlackClient {
       text: '*📋 Executive Summary*',
     });
     
-    // Post summary as plain text messages - Slack allows 40,000 chars per message
+    // Post summary as plain text messages in 3000 char chunks
+    // While Slack allows 40k chars, 3k is safer for display compatibility across clients
     // Use plain text (no blocks) to completely avoid any truncation or "See more" behavior
-    const MAX_MESSAGE_TEXT = 40000; // Slack's actual message limit
+    const MAX_MESSAGE_TEXT = 3000; // Safe chunk size for reliable display
     let remaining = summaryText;
     let summaryMessageNum = 1;
     
@@ -337,9 +338,10 @@ export class SlackClient {
       text: nextStepsHeader,
     });
     
-    // Post Next Steps as plain text messages - Slack allows 40,000 chars per message
+    // Post Next Steps as plain text messages in 3000 char chunks
+    // While Slack allows 40k chars, 3k is safer for display compatibility across clients
     // Use plain text (no blocks) to completely avoid any truncation
-    const MAX_MESSAGE_TEXT = 40000; // Slack's actual message limit
+    const MAX_MESSAGE_TEXT = 3000; // Safe chunk size for reliable display
     remaining = nextStepsText;
     let nextStepsMessageNum = 1;
     
