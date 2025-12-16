@@ -60,13 +60,45 @@ export class ClaudeClient {
    * Looks for common headers and extracts content
    */
   private parseResponse(markdown: string): Omit<ClaudeAnalysisResult, 'fullResponse'> {
-    // Extract executive summary
-    const execSummaryMatch = markdown.match(/###?\s*Executive Summary[\s\S]*?\n\n([\s\S]*?)(?=\n###|$)/i);
-    const execSummary = execSummaryMatch ? execSummaryMatch[1].trim() : '';
+    // Extract executive summary - capture everything from "Executive Summary" until "Next Steps" or similar
+    // This includes subsections like "Deal Health Assessment" that are formatted as ### headers
+    // but are actually part of the Executive Summary section
+    const nextSectionPattern = /\n###?\s*(?:Next Steps|Recommendations|Critical Recommendations|Key Learnings)/i;
+    const nextSectionMatch = markdown.match(nextSectionPattern);
+    const execSummaryHeaderMatch = markdown.match(/###?\s*Executive Summary/i);
     
-    // Extract next steps / recommendations
-    const nextStepsMatch = markdown.match(/###?\s*(?:Next Steps|Recommendations|Critical Recommendations)[\s\S]*?\n\n([\s\S]*?)(?=\n###|$)/i);
-    const nextSteps = nextStepsMatch ? nextStepsMatch[1].trim() : '';
+    let execSummary = '';
+    
+    if (execSummaryHeaderMatch) {
+      const startIndex = execSummaryHeaderMatch.index! + execSummaryHeaderMatch[0].length;
+      const endIndex = nextSectionMatch ? nextSectionMatch.index! : markdown.length;
+      
+      // Extract everything from after "Executive Summary" header until next major section
+      execSummary = markdown.substring(startIndex, endIndex).trim();
+      
+      // Remove leading newlines/whitespace
+      execSummary = execSummary.replace(/^\s*\n+/, '').trim();
+    }
+    
+    // Fallback: if extraction failed, try sections
+    if (!execSummary || execSummary.length < 100) {
+      const sections = this.extractSections(markdown);
+      if (sections['Executive Summary']) {
+        execSummary = sections['Executive Summary'];
+      }
+    }
+    
+    // Extract next steps / recommendations - improved regex
+    const nextStepsMatch = markdown.match(/###?\s*(?:Next Steps|Recommendations|Critical Recommendations|Key Learnings)[\s\S]*?\n\n([\s\S]*?)(?=\n###\s+(?!.*\n##)|$)/i);
+    let nextSteps = nextStepsMatch ? nextStepsMatch[1].trim() : '';
+    
+    // If regex didn't match, try sections
+    if (!nextSteps || nextSteps.length < 50) {
+      const sections = this.extractSections(markdown);
+      if (sections['Next Steps'] || sections['Recommendations'] || sections['Critical Recommendations']) {
+        nextSteps = sections['Next Steps'] || sections['Recommendations'] || sections['Critical Recommendations'];
+      }
+    }
     
     // Store full response as details
     const details = {

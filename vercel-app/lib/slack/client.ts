@@ -339,9 +339,7 @@ export class SlackClient {
     });
     
     // Post Next Steps as plain text messages in 3000 char chunks
-    // While Slack allows 40k chars, 3k is safer for display compatibility across clients
-    // Use plain text (no blocks) to completely avoid any truncation
-    const MAX_MESSAGE_TEXT = 3000; // Safe chunk size for reliable display
+    // Reuse MAX_MESSAGE_TEXT from above
     remaining = nextStepsText;
     let nextStepsMessageNum = 1;
     
