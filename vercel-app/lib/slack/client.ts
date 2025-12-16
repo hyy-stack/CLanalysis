@@ -275,39 +275,22 @@ export class SlackClient {
       text: '*📋 Executive Summary*',
     });
     
-    // Post summary - split into multiple section blocks per message (each block max 3000 chars)
-    // Slack allows up to 50 blocks per message, so we can fit ~150k chars per message
-    const MAX_BLOCK_TEXT = 2800; // Safe limit for section blocks
-    const MAX_BLOCKS_PER_MESSAGE = 50; // Slack's block limit
+    // Post summary as plain text messages - Slack allows 40,000 chars per message
+    // Use plain text (no blocks) to completely avoid any truncation or "See more" behavior
+    const MAX_MESSAGE_TEXT = 40000; // Slack's actual message limit
     let remaining = summaryText;
     let summaryMessageNum = 1;
     
     while (remaining.length > 0) {
-      const blocks: any[] = [];
-      let blocksInMessage = 0;
+      const chunk = remaining.substring(0, MAX_MESSAGE_TEXT);
+      remaining = remaining.substring(MAX_MESSAGE_TEXT);
       
-      // Fill message with as many blocks as possible (up to 50 blocks = ~140k chars)
-      while (remaining.length > 0 && blocksInMessage < MAX_BLOCKS_PER_MESSAGE) {
-        const chunk = remaining.substring(0, MAX_BLOCK_TEXT);
-        remaining = remaining.substring(MAX_BLOCK_TEXT);
-        
-        blocks.push({
-          type: 'section',
-          text: {
-            type: 'mrkdwn',
-            text: chunk,
-          },
-        });
-        
-        blocksInMessage++;
-      }
-      
-      // Post message with multiple blocks
+      // Post as plain text message ONLY - no blocks at all
+      // This ensures full text is displayed without any truncation
       await this.client.chat.postMessage({
         channel: this.channelId,
         thread_ts: threadTs,
-        text: summaryMessageNum > 1 ? `Executive Summary (continued, part ${summaryMessageNum})` : 'Executive Summary',
-        blocks,
+        text: chunk, // Plain text only - no blocks
       });
       
       summaryMessageNum++;
@@ -354,37 +337,22 @@ export class SlackClient {
       text: nextStepsHeader,
     });
     
-    // Post Next Steps - split into multiple section blocks per message
-    // Reuse constants from above
+    // Post Next Steps as plain text messages - Slack allows 40,000 chars per message
+    // Use plain text (no blocks) to completely avoid any truncation
+    const MAX_MESSAGE_TEXT = 40000; // Slack's actual message limit
     remaining = nextStepsText;
     let nextStepsMessageNum = 1;
     
     while (remaining.length > 0) {
-      const blocks: any[] = [];
-      let blocksInMessage = 0;
+      const chunk = remaining.substring(0, MAX_MESSAGE_TEXT);
+      remaining = remaining.substring(MAX_MESSAGE_TEXT);
       
-      // Fill message with as many blocks as possible (up to 50 blocks = ~140k chars)
-      while (remaining.length > 0 && blocksInMessage < MAX_BLOCKS_PER_MESSAGE) {
-        const chunk = remaining.substring(0, MAX_BLOCK_TEXT);
-        remaining = remaining.substring(MAX_BLOCK_TEXT);
-        
-        blocks.push({
-          type: 'section',
-          text: {
-            type: 'mrkdwn',
-            text: chunk,
-          },
-        });
-        
-        blocksInMessage++;
-      }
-      
-      // Post message with multiple blocks
+      // Post as plain text message ONLY - no blocks at all
+      // This ensures full text is displayed without any truncation
       await this.client.chat.postMessage({
         channel: this.channelId,
         thread_ts: threadTs,
-        text: nextStepsMessageNum > 1 ? `${isActiveDeal ? 'Next Steps' : 'Key Learnings'} (continued, part ${nextStepsMessageNum})` : (isActiveDeal ? 'Next Steps' : 'Key Learnings'),
-        blocks,
+        text: chunk, // Plain text only - no blocks
       });
       
       nextStepsMessageNum++;
