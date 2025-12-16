@@ -193,13 +193,25 @@ export class SlackClient {
     // Add a subtle divider
     mainBlocks.push({ type: 'divider' });
     
-    // Add analysis timestamp
+    // Add analysis timestamp - use analysis.created_at if available, otherwise current time
+    const analysisTime = analysis.created_at 
+      ? new Date(analysis.created_at).toLocaleString('en-US', { 
+          timeZone: 'America/Los_Angeles', // Use Pacific timezone
+          dateStyle: 'short',
+          timeStyle: 'short'
+        })
+      : new Date().toLocaleString('en-US', { 
+          timeZone: 'America/Los_Angeles',
+          dateStyle: 'short',
+          timeStyle: 'short'
+        });
+    
     mainBlocks.push({
       type: 'context',
       elements: [
         {
           type: 'mrkdwn',
-          text: `🤖 Analysis completed ${new Date().toLocaleString()} | View thread for details ⬇️`,
+          text: `🤖 Analysis completed ${analysisTime} | View thread for details ⬇️`,
         },
       ],
     });
