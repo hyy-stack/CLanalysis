@@ -90,6 +90,9 @@ export async function POST(request: NextRequest) {
     const analysisResult = await claudeClient.analyze(fullPrompt);
     
     console.log('[Analysis] Claude analysis complete');
+    console.log(`[Analysis] Exec summary length: ${analysisResult.execSummary.length} chars`);
+    console.log(`[Analysis] Next steps length: ${analysisResult.nextSteps.length} chars`);
+    console.log(`[Analysis] Full response length: ${analysisResult.fullResponse.length} chars`);
     
     // Determine analysis type based on deal stage
     let dbAnalysisType: 'active_health' | 'closed_lost' | 'closed_won' | 'customer_sentiment';

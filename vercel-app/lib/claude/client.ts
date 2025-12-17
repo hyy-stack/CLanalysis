@@ -45,6 +45,8 @@ export class ClaudeClient {
       : '';
     
     console.log(`[Claude] Response length: ${response.length} chars`);
+    console.log(`[Claude] Response preview (first 500 chars): ${response.substring(0, 500)}`);
+    console.log(`[Claude] Response preview (last 500 chars): ${response.substring(Math.max(0, response.length - 500))}`);
     
     // Parse the response
     const parsed = this.parseResponse(response);
@@ -108,6 +110,8 @@ export class ClaudeClient {
       execSummary = execSummary.replace(/^\s*\n+/, '').trim();
       
       console.log(`[Claude] Extracted exec summary: ${execSummary.length} chars (start: ${startIndex}, end: ${endIndex})`);
+      console.log(`[Claude] Exec summary preview (first 300 chars): ${execSummary.substring(0, 300)}`);
+      console.log(`[Claude] Exec summary preview (last 300 chars): ${execSummary.substring(Math.max(0, execSummary.length - 300))}`);
     }
     
     // Fallback: if extraction failed or seems too short, try a more aggressive approach
