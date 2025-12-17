@@ -63,28 +63,74 @@ export class ClaudeClient {
     // Extract executive summary - capture everything from "Executive Summary" until "Next Steps" or similar
     // This includes subsections like "Deal Health Assessment" that are formatted as ### headers
     // but are actually part of the Executive Summary section
-    const nextSectionPattern = /\n###?\s*(?:Next Steps|Recommendations|Critical Recommendations|Key Learnings)/i;
-    const nextSectionMatch = markdown.match(nextSectionPattern);
+    
+    // Find the start of Executive Summary section
     const execSummaryHeaderMatch = markdown.match(/###?\s*Executive Summary/i);
     
+    // Find the start of the next major section (Next Steps, Recommendations, etc.)
+    // Look for these headers that come AFTER Executive Summary
+    const nextSectionHeaders = [
+      'Next Steps',
+      'Recommendations', 
+      'Critical Recommendations',
+      'Key Learnings',
+      'Critical Recommendations',
+      'Timeline Assessment',
+      'Competitive Landscape',
+      'Objections & Concerns',
+      'Customer Sentiment Evolution',
+      'Critical Recommendations',
+      'Deal Forecast'
+    ];
+    
     let execSummary = '';
+    let endIndex = markdown.length;
     
     if (execSummaryHeaderMatch) {
       const startIndex = execSummaryHeaderMatch.index! + execSummaryHeaderMatch[0].length;
-      const endIndex = nextSectionMatch ? nextSectionMatch.index! : markdown.length;
+      
+      // Find the earliest occurrence of any "next section" header after Executive Summary
+      for (const header of nextSectionHeaders) {
+        const pattern = new RegExp(`\\n###?\\s*${header.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i');
+        const match = markdown.substring(startIndex).match(pattern);
+        if (match && match.index !== undefined) {
+          const candidateEnd = startIndex + match.index;
+          if (candidateEnd < endIndex) {
+            endIndex = candidateEnd;
+          }
+        }
+      }
       
       // Extract everything from after "Executive Summary" header until next major section
       execSummary = markdown.substring(startIndex, endIndex).trim();
       
       // Remove leading newlines/whitespace
       execSummary = execSummary.replace(/^\s*\n+/, '').trim();
+      
+      console.log(`[Claude] Extracted exec summary: ${execSummary.length} chars (start: ${startIndex}, end: ${endIndex})`);
     }
     
-    // Fallback: if extraction failed, try sections
-    if (!execSummary || execSummary.length < 100) {
-      const sections = this.extractSections(markdown);
-      if (sections['Executive Summary']) {
-        execSummary = sections['Executive Summary'];
+    // Fallback: if extraction failed or seems too short, try a more aggressive approach
+    if (!execSummary || execSummary.length < 200) {
+      console.log(`[Claude] Exec summary too short (${execSummary.length} chars), trying fallback extraction`);
+      
+      // Try extracting everything before common "next section" headers
+      const beforeNextSteps = markdown.split(/\n###?\s*(?:Next Steps|Recommendations|Critical Recommendations|Key Learnings)/i)[0];
+      if (beforeNextSteps) {
+        const afterHeader = beforeNextSteps.split(/###?\s*Executive Summary/i)[1];
+        if (afterHeader && afterHeader.length > execSummary.length) {
+          execSummary = afterHeader.replace(/^[\s\S]*?\n\n/, '').trim();
+          console.log(`[Claude] Fallback extraction: ${execSummary.length} chars`);
+        }
+      }
+      
+      // Last resort: try sections
+      if (!execSummary || execSummary.length < 200) {
+        const sections = this.extractSections(markdown);
+        if (sections['Executive Summary'] && sections['Executive Summary'].length > execSummary.length) {
+          execSummary = sections['Executive Summary'];
+          console.log(`[Claude] Using sections extraction: ${execSummary.length} chars`);
+        }
       }
     }
     
