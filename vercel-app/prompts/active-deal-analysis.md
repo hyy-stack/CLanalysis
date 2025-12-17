@@ -26,7 +26,11 @@ For each call in the series, examine:
 
 ## Output Format
 
-**IMPORTANT**: Keep detailed analysis in the "Deal Health Assessment" section (Current Status, Momentum Direction, Confidence Level). Starting from "Positive Indicators" onward, use concise bullet points without evidence, quotes, or explanations. Just list the key points.
+**IMPORTANT**: 
+- Keep detailed analysis in the "Deal Health Assessment" section (Current Status, Momentum Direction, Confidence Level)
+- For "Positive Indicators" and "Warning Signs", list ONLY category names as bullet points (no sub-bullets, no explanations, no evidence)
+- End the analysis after "Warning Signs" - do NOT include Customer Engagement Analysis, Decision-Making Process, Competitive Landscape, Timeline Assessment, Objections & Concerns Tracking, Customer Sentiment Evolution, Deal Forecast, or any other sections
+- Only include "Next Steps" section after Warning Signs
 
 ### Overall Deal Health Score: [1-10]
 
@@ -46,158 +50,30 @@ Provide a score where:
 
 ### Positive Indicators (What's Going Well)
 
-List specific signs that the deal is healthy. Use concise bullet points without evidence or explanations. Format as:
-- Category name (e.g., "Strong Buying Signals", "Operational Engagement", "Business Profile Fit")
-- Top-level list items only (no quotes, no explanations, no evidence)
+List only the category names as simple bullet points. Do NOT include sub-bullets or explanations.
 
 Example format:
-* Strong Buying Signals
-* Proactive timing
-* Budget-conscious planning
-* Implementation readiness
-* Decision-making authority
+* Strong Business Need
+* Budget & Authority Signals
+* Professional Buyer Behavior
+* Operational Readiness
 
 ### Warning Signs (Red Flags to Address)
 
-List concerns concisely without evidence or explanations. Use categories and simple bullet points.
+List only category names under each severity level. Do NOT include sub-bullets or explanations.
 
 **Critical Issues** (Immediate attention required):
-- Category name
-- List items only (no quotes, no explanations)
+* Category name only
 
 **Medium Risks** (Monitor closely):
-- Category name
-- List items only (no quotes, no explanations)
+* Category name only
 
 **Minor Concerns** (Watch for patterns):
-- Simple list items only
+* Simple list items only
 
-### Customer Engagement Analysis
+### Next Steps
 
-**Engagement Level**: [High / Medium / Low]
-
-**Evidence**:
-- How responsive are they?
-- How detailed are their questions?
-- Are they bringing in the right people?
-- Are they volunteering information?
-
-**Engagement Trend**: [Increasing / Stable / Decreasing]
-
-### Decision-Making Process
-
-**Key Stakeholders Identified**:
-- Who have we talked to?
-- Who's missing from the conversation?
-- Who seems to have decision authority?
-
-**Decision Process Clarity**: [Clear / Somewhat Clear / Unclear]
-
-**What We Know**:
-- Timeline expectations
-- Budget/pricing discussions
-- Approval process
-- Internal champion(s)
-
-**What We Don't Know** (and should find out):
-- Missing information about their process
-- Unanswered questions
-- Stakeholders we haven't met
-
-### Competitive Landscape
-
-**Competitor Mentions**: [None / Indirect / Direct]
-
-**Specific Intelligence**:
-- Any vendors mentioned by name
-- Comparisons being made
-- Our positioning vs. alternatives
-
-**Competitive Risk Level**: [Low / Medium / High]
-
-### Timeline Assessment
-
-**Customer's Timeline**: [What they've indicated]
-
-**Our Timeline Assumptions**: [What we're planning]
-
-**Alignment**: [Aligned / Misaligned / Unclear]
-
-**Risks**:
-- Any timeline extensions or delays mentioned
-- Urgency increasing or decreasing
-- External factors affecting timing
-
-### Objections & Concerns Tracking
-
-**Already Addressed**:
-- Concern that was raised
-- How it was handled
-- Resolution status
-
-**Outstanding Concerns**:
-- Unresolved objections
-- Concerns they keep coming back to
-- Areas where we need better answers
-
-**Potential Future Objections**:
-- Based on patterns, what might come up
-- How to proactively address
-
-### Customer Sentiment Evolution
-
-**Call 1 → Call 2 → Call 3** (etc.):
-
-Track how sentiment is changing:
-- Initial sentiment and energy
-- How it shifted in each subsequent call
-- Current sentiment level
-- Overall trajectory
-
-### Critical Recommendations
-
-**Immediate Actions** (Next 1-2 days):
-1. Specific action with rationale
-2. Action with expected outcome
-3. Action to address specific risk
-
-**Short-term Actions** (Next 1-2 weeks):
-1. Strategic move to advance deal
-2. Stakeholder to engage
-3. Information to gather
-
-**Do Not** (Things to avoid):
-- Actions that could damage the deal
-- Mistakes to avoid based on conversation patterns
-- Topics to handle carefully
-
-### Next Call Preparation
-
-**Topics to Cover**:
-- Questions to ask
-- Information to provide
-- Concerns to address
-
-**Stakeholders to Include**:
-- Who should be on the next call
-- Why they're needed
-
-**Success Criteria for Next Call**:
-- What would make the next call a win
-- Commitments to seek
-
-### Deal Forecast
-
-**Probability of Close**: [Percentage with justification]
-
-**Expected Close Timeframe**: [Estimate based on conversations]
-
-**Key Dependencies**:
-- What needs to happen for this to close
-- What could prevent closure
-- External factors in play
-
-**Recommended Deal Stage**: [Based on actual progress, what stage should this be in?]
+Provide actionable recommendations for what to do next to advance this deal. Be specific and concise.
 
 ---
 
