@@ -152,6 +152,30 @@ export class ClaudeClient {
       sections: this.extractSections(markdown),
     };
     
+    // Final safety check: if exec summary seems incomplete (less than 500 chars), 
+    // use a more aggressive extraction - everything from Executive Summary to end, 
+    // then let Next Steps extraction handle its own section
+    if (execSummary.length < 500) {
+      console.log(`[Claude] Exec summary seems incomplete (${execSummary.length} chars), trying aggressive extraction`);
+      const execHeaderIndex = markdown.indexOf('### Executive Summary');
+      if (execHeaderIndex >= 0) {
+        // Get everything from Executive Summary to the end, then we'll extract Next Steps separately
+        const fromExecSummary = markdown.substring(execHeaderIndex);
+        // Remove the header line itself
+        const withoutHeader = fromExecSummary.replace(/^###\s*Executive Summary\s*/i, '').trim();
+        // If this is longer than what we extracted, use it (but still try to stop at Next Steps if found)
+        if (withoutHeader.length > execSummary.length) {
+          const nextStepsIndex = withoutHeader.search(/\n###\s*(?:Next Steps|Recommendations|Critical Recommendations|Key Learnings)/i);
+          if (nextStepsIndex > 0) {
+            execSummary = withoutHeader.substring(0, nextStepsIndex).trim();
+          } else {
+            execSummary = withoutHeader;
+          }
+          console.log(`[Claude] Aggressive extraction: ${execSummary.length} chars`);
+        }
+      }
+    }
+    
     return {
       execSummary: execSummary || markdown.substring(0, 500),
       nextSteps: nextSteps || 'See full analysis for details',
