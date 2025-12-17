@@ -71,6 +71,7 @@ export class ClaudeClient {
     console.log(`[Claude] Found ${allHeaders.length} headers in response:`, allHeaders.slice(0, 10));
     
     // Find the start of Executive Summary section - try multiple formats
+    // Also recognize that the first major section IS the executive summary, even if not labeled as such
     let execSummaryHeaderMatch = markdown.match(/^#{1,3}\s*Executive Summary/i);
     if (!execSummaryHeaderMatch) {
       execSummaryHeaderMatch = markdown.match(/###?\s*Executive Summary/i);
@@ -82,7 +83,17 @@ export class ClaudeClient {
       execSummaryHeaderMatch = markdown.match(/#\s*Executive Summary/i);
     }
     
-    console.log(`[Claude] Executive Summary header match:`, execSummaryHeaderMatch ? `Found at index ${execSummaryHeaderMatch.index}` : 'NOT FOUND');
+    // If no "Executive Summary" header found, treat the first major section as the exec summary
+    // This handles cases where Claude uses "Active Deal Health Analysis" or similar as the first section
+    if (!execSummaryHeaderMatch) {
+      const firstHeaderMatch = markdown.match(/^#{1,2}\s+.+$/m);
+      if (firstHeaderMatch) {
+        execSummaryHeaderMatch = firstHeaderMatch;
+        console.log(`[Claude] No "Executive Summary" header found, using first major section: "${firstHeaderMatch[0]}"`);
+      }
+    }
+    
+    console.log(`[Claude] Executive Summary header match:`, execSummaryHeaderMatch ? `Found at index ${execSummaryHeaderMatch.index}: "${execSummaryHeaderMatch[0]}"` : 'NOT FOUND');
     
     // Find the start of the next major section (Next Steps, Recommendations, etc.)
     // Look for these headers that come AFTER Executive Summary
@@ -108,17 +119,24 @@ export class ClaudeClient {
       
       // Find the earliest occurrence of any "next section" header after Executive Summary
       for (const header of nextSectionHeaders) {
-        const pattern = new RegExp(`\\n###?\\s*${header.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i');
-        const match = markdown.substring(startIndex).match(pattern);
-        if (match && match.index !== undefined) {
-          const candidateEnd = startIndex + match.index;
-          if (candidateEnd < endIndex) {
-            endIndex = candidateEnd;
+        // Try multiple header formats for next section
+        const patterns = [
+          new RegExp(`\\n#{1,3}\\s*${header.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i'),
+          new RegExp(`^#{1,3}\\s*${header.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'im'),
+        ];
+        
+        for (const pattern of patterns) {
+          const match = markdown.substring(startIndex).match(pattern);
+          if (match && match.index !== undefined) {
+            const candidateEnd = startIndex + match.index;
+            if (candidateEnd < endIndex) {
+              endIndex = candidateEnd;
+            }
           }
         }
       }
       
-      // Extract everything from after "Executive Summary" header until next major section
+      // Extract everything from after the header until next major section
       execSummary = markdown.substring(startIndex, endIndex).trim();
       
       // Remove leading newlines/whitespace
