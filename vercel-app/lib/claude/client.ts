@@ -66,8 +66,23 @@ export class ClaudeClient {
     // This includes subsections like "Deal Health Assessment" that are formatted as ### headers
     // but are actually part of the Executive Summary section
     
-    // Find the start of Executive Summary section
-    const execSummaryHeaderMatch = markdown.match(/###?\s*Executive Summary/i);
+    // Debug: Log all headers found in the response
+    const allHeaders = markdown.match(/^#{1,3}\s+.+$/gm) || [];
+    console.log(`[Claude] Found ${allHeaders.length} headers in response:`, allHeaders.slice(0, 10));
+    
+    // Find the start of Executive Summary section - try multiple formats
+    let execSummaryHeaderMatch = markdown.match(/^#{1,3}\s*Executive Summary/i);
+    if (!execSummaryHeaderMatch) {
+      execSummaryHeaderMatch = markdown.match(/###?\s*Executive Summary/i);
+    }
+    if (!execSummaryHeaderMatch) {
+      execSummaryHeaderMatch = markdown.match(/##\s*Executive Summary/i);
+    }
+    if (!execSummaryHeaderMatch) {
+      execSummaryHeaderMatch = markdown.match(/#\s*Executive Summary/i);
+    }
+    
+    console.log(`[Claude] Executive Summary header match:`, execSummaryHeaderMatch ? `Found at index ${execSummaryHeaderMatch.index}` : 'NOT FOUND');
     
     // Find the start of the next major section (Next Steps, Recommendations, etc.)
     // Look for these headers that come AFTER Executive Summary
@@ -118,19 +133,55 @@ export class ClaudeClient {
     if (!execSummary || execSummary.length < 200) {
       console.log(`[Claude] Exec summary too short (${execSummary.length} chars), trying fallback extraction`);
       
-      // Try extracting everything before common "next section" headers
-      const beforeNextSteps = markdown.split(/\n###?\s*(?:Next Steps|Recommendations|Critical Recommendations|Key Learnings)/i)[0];
-      if (beforeNextSteps) {
-        const afterHeader = beforeNextSteps.split(/###?\s*Executive Summary/i)[1];
-        if (afterHeader && afterHeader.length > execSummary.length) {
-          execSummary = afterHeader.replace(/^[\s\S]*?\n\n/, '').trim();
-          console.log(`[Claude] Fallback extraction: ${execSummary.length} chars`);
+      // Try extracting everything before common "next section" headers - try multiple header formats
+      const nextStepsPatterns = [
+        /\n#{1,3}\s*(?:Next Steps|Recommendations|Critical Recommendations|Key Learnings)/i,
+        /^#{1,3}\s*(?:Next Steps|Recommendations|Critical Recommendations|Key Learnings)/im,
+      ];
+      
+      let beforeNextSteps = markdown;
+      for (const pattern of nextStepsPatterns) {
+        const split = markdown.split(pattern);
+        if (split.length > 1 && split[0].length < beforeNextSteps.length) {
+          beforeNextSteps = split[0];
+        }
+      }
+      
+      if (beforeNextSteps && beforeNextSteps.length > 0) {
+        // Try to find Executive Summary header in various formats
+        const execPatterns = [
+          /#{1,3}\s*Executive Summary/i,
+          /Executive Summary/i,
+        ];
+        
+        for (const pattern of execPatterns) {
+          const match = beforeNextSteps.match(pattern);
+          if (match) {
+            const startIdx = match.index! + match[0].length;
+            const extracted = beforeNextSteps.substring(startIdx).trim();
+            if (extracted.length > execSummary.length) {
+              execSummary = extracted.replace(/^\s*\n+/, '').trim();
+              console.log(`[Claude] Fallback extraction (pattern ${pattern}): ${execSummary.length} chars`);
+              break;
+            }
+          }
+        }
+        
+        // If still no exec summary, just take everything from the start (might be the whole response before Next Steps)
+        if (!execSummary || execSummary.length < 200) {
+          // Remove any leading headers/titles
+          const cleaned = beforeNextSteps.replace(/^#{1,3}\s*[^\n]+\n+/m, '').trim();
+          if (cleaned.length > execSummary.length && cleaned.length > 200) {
+            execSummary = cleaned;
+            console.log(`[Claude] Fallback: using everything before Next Steps: ${execSummary.length} chars`);
+          }
         }
       }
       
       // Last resort: try sections
       if (!execSummary || execSummary.length < 200) {
         const sections = this.extractSections(markdown);
+        console.log(`[Claude] Available sections:`, Object.keys(sections));
         if (sections['Executive Summary'] && sections['Executive Summary'].length > execSummary.length) {
           execSummary = sections['Executive Summary'];
           console.log(`[Claude] Using sections extraction: ${execSummary.length} chars`);
@@ -161,23 +212,49 @@ export class ClaudeClient {
     // then let Next Steps extraction handle its own section
     if (execSummary.length < 500) {
       console.log(`[Claude] Exec summary seems incomplete (${execSummary.length} chars), trying aggressive extraction`);
-      const execHeaderIndex = markdown.indexOf('### Executive Summary');
-      if (execHeaderIndex >= 0) {
-        // Get everything from Executive Summary to the end, then we'll extract Next Steps separately
-        const fromExecSummary = markdown.substring(execHeaderIndex);
-        // Remove the header line itself
-        const withoutHeader = fromExecSummary.replace(/^###\s*Executive Summary\s*/i, '').trim();
-        // If this is longer than what we extracted, use it (but still try to stop at Next Steps if found)
-        if (withoutHeader.length > execSummary.length) {
-          const nextStepsIndex = withoutHeader.search(/\n###\s*(?:Next Steps|Recommendations|Critical Recommendations|Key Learnings)/i);
-          if (nextStepsIndex > 0) {
-            execSummary = withoutHeader.substring(0, nextStepsIndex).trim();
-          } else {
-            execSummary = withoutHeader;
+      
+      // Try multiple formats to find Executive Summary
+      const execHeaderPatterns = [
+        /###\s*Executive Summary/i,
+        /##\s*Executive Summary/i,
+        /#\s*Executive Summary/i,
+        /Executive Summary/i,
+      ];
+      
+      for (const pattern of execHeaderPatterns) {
+        const match = markdown.match(pattern);
+        if (match) {
+          const execHeaderIndex = match.index!;
+          // Get everything from Executive Summary to the end, then we'll extract Next Steps separately
+          const fromExecSummary = markdown.substring(execHeaderIndex);
+          // Remove the header line itself
+          const withoutHeader = fromExecSummary.replace(/^#{1,3}\s*Executive Summary\s*/i, '').trim();
+          // If this is longer than what we extracted, use it (but still try to stop at Next Steps if found)
+          if (withoutHeader.length > execSummary.length) {
+            const nextStepsIndex = withoutHeader.search(/\n#{1,3}\s*(?:Next Steps|Recommendations|Critical Recommendations|Key Learnings)/i);
+            if (nextStepsIndex > 0) {
+              execSummary = withoutHeader.substring(0, nextStepsIndex).trim();
+            } else {
+              execSummary = withoutHeader;
+            }
+            console.log(`[Claude] Aggressive extraction (pattern ${pattern}): ${execSummary.length} chars`);
+            break;
           }
-          console.log(`[Claude] Aggressive extraction: ${execSummary.length} chars`);
         }
       }
+    }
+    
+    // Ultimate fallback: if we still have nothing meaningful, use the first substantial chunk
+    // But try to stop before Next Steps if we can find it
+    if (!execSummary || execSummary.length < 200) {
+      console.log(`[Claude] Ultimate fallback: using first part of response`);
+      const nextStepsMatch = markdown.match(/\n#{1,3}\s*(?:Next Steps|Recommendations|Critical Recommendations|Key Learnings)/i);
+      if (nextStepsMatch && nextStepsMatch.index! > 500) {
+        execSummary = markdown.substring(0, nextStepsMatch.index!).trim();
+      } else {
+        execSummary = markdown.substring(0, Math.min(3000, markdown.length)).trim();
+      }
+      console.log(`[Claude] Ultimate fallback result: ${execSummary.length} chars`);
     }
     
     return {
