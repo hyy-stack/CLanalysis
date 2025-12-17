@@ -26,6 +26,8 @@ For each call in the series, examine:
 
 ## Output Format
 
+**IMPORTANT**: Keep detailed analysis in the "Deal Health Assessment" section (Current Status, Momentum Direction, Confidence Level). Starting from "Positive Indicators" onward, use concise bullet points without evidence, quotes, or explanations. Just list the key points.
+
 ### Overall Deal Health Score: [1-10]
 
 Provide a score where:
@@ -44,28 +46,31 @@ Provide a score where:
 
 ### Positive Indicators (What's Going Well)
 
-List specific signs that the deal is healthy:
-- Quote from customer showing engagement
-- Actions they've taken (filled forms, scheduled meetings, involved stakeholders)
-- Language indicating commitment
-- Timeline discussions showing urgency
-- Technical validation progress
+List specific signs that the deal is healthy. Use concise bullet points without evidence or explanations. Format as:
+- Category name (e.g., "Strong Buying Signals", "Operational Engagement", "Business Profile Fit")
+- Top-level list items only (no quotes, no explanations, no evidence)
+
+Example format:
+* Strong Buying Signals
+* Proactive timing
+* Budget-conscious planning
+* Implementation readiness
+* Decision-making authority
 
 ### Warning Signs (Red Flags to Address)
 
+List concerns concisely without evidence or explanations. Use categories and simple bullet points.
+
 **Critical Issues** (Immediate attention required):
-- Specific concern with customer quote
-- Why it's critical
-- Recommended action
+- Category name
+- List items only (no quotes, no explanations)
 
 **Medium Risks** (Monitor closely):
-- Concern with evidence
-- Potential impact
-- How to mitigate
+- Category name
+- List items only (no quotes, no explanations)
 
 **Minor Concerns** (Watch for patterns):
-- Areas to keep an eye on
-- Why they might become bigger issues
+- Simple list items only
 
 ### Customer Engagement Analysis
 
