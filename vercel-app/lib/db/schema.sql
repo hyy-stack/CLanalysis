@@ -13,6 +13,9 @@ CREATE TABLE IF NOT EXISTS deals (
   amount DECIMAL(15, 2),
   currency VARCHAR(10) DEFAULT 'USD',
   account_name VARCHAR(500),
+  opportunity_type VARCHAR(100),
+  owner_name VARCHAR(255),
+  role_segment VARCHAR(100),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -21,6 +24,7 @@ CREATE TABLE IF NOT EXISTS deals (
 CREATE INDEX IF NOT EXISTS idx_deals_crm_id ON deals(crm_id);
 CREATE INDEX IF NOT EXISTS idx_deals_stage ON deals(stage);
 CREATE INDEX IF NOT EXISTS idx_deals_updated_at ON deals(updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_deals_role_segment ON deals(role_segment);
 
 -- Interactions table: Both calls and emails
 CREATE TABLE IF NOT EXISTS interactions (
