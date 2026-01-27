@@ -109,13 +109,18 @@ export async function buildContext(
  * Format deal info for prompt
  */
 export function formatDealInfo(deal: Deal): string {
-  return `
+  let info = `
 **Deal Name**: ${deal.name}
 **CRM ID**: ${deal.crm_id}
 **Stage**: ${deal.stage}
 **Account**: ${deal.account_name || 'N/A'}
-**Value**: ${deal.amount ? `${deal.currency || '$'}${deal.amount.toLocaleString()}` : 'N/A'}
-  `.trim();
+**Value**: ${deal.amount ? `${deal.currency || '$'}${deal.amount.toLocaleString()}` : 'N/A'}`;
+
+  if (deal.role_segment) {
+    info += `\n**Role Segment**: ${deal.role_segment}`;
+  }
+
+  return info.trim();
 }
 
 /**

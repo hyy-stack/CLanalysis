@@ -12,6 +12,7 @@ export interface Deal {
   account_name?: string;
   opportunity_type?: string;
   owner_name?: string;
+  role_segment?: string;
   created_at: Date;
   updated_at: Date;
 }

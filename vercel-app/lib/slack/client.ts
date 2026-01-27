@@ -20,16 +20,19 @@ export class SlackClient {
    * @param analysis - The analysis results
    * @param interactions - All interactions (calls/emails) for context
    * @param manualEmails - Manual emails for context
+   * @param channelOverride - Optional channel ID to post to instead of default
    * @returns Slack message timestamp
    */
   async postAnalysis(
-    deal: Deal, 
+    deal: Deal,
     analysis: Analysis,
     interactions: any[] = [],
-    manualEmails: any[] = []
+    manualEmails: any[] = [],
+    channelOverride?: string
   ): Promise<string> {
-    console.log('[Slack] Posting analysis for deal:', deal.name);
-    
+    const targetChannel = channelOverride || this.channelId;
+    console.log('[Slack] Posting analysis for deal:', deal.name, 'to channel:', targetChannel);
+
     // Check for excluded interactions and emails
     const { getExcludedInteractionsForDeal, getExcludedManualEmailsForDeal } = await import('@/lib/db/client');
     const excludedInteractions = await getExcludedInteractionsForDeal(deal.id);
@@ -82,6 +85,10 @@ export class SlackClient {
         type: 'mrkdwn',
         text: `*Value*\n${deal.amount ? `${deal.currency || '$'}${deal.amount.toLocaleString()}` : 'TBD'}`,
       },
+      ...(deal.role_segment ? [{
+        type: 'mrkdwn',
+        text: `*Segment*\n${deal.role_segment}`,
+      }] : []),
     ];
     
     // Add health score to main message for non-closed deals
@@ -218,7 +225,7 @@ export class SlackClient {
     
     // Post main message
     const mainMessage = await this.client.chat.postMessage({
-      channel: this.channelId,
+      channel: targetChannel,
       text: `${emoji} Analysis: ${deal.name}`,
       blocks: mainBlocks,
     });
@@ -229,7 +236,7 @@ export class SlackClient {
     
     // Post detailed analysis in thread
     try {
-      await this.postThreadedAnalysis(threadTs, analysis, deal);
+      await this.postThreadedAnalysis(threadTs, analysis, deal, targetChannel);
       console.log('[Slack] Thread details posted successfully');
       
       // Don't auto-post interactions - let users click "View Deal Data" button instead
@@ -240,7 +247,7 @@ export class SlackClient {
       console.error('[Slack] Failed to post thread details:', error);
       // Post a simple fallback message
       await this.client.chat.postMessage({
-        channel: this.channelId,
+        channel: targetChannel,
         thread_ts: threadTs,
         text: `Analysis complete but detailed view failed. Executive Summary: ${analysis.exec_summary.substring(0, 500)}`,
       });
@@ -258,7 +265,8 @@ export class SlackClient {
   private async postThreadedAnalysis(
     threadTs: string,
     analysis: Analysis,
-    deal: Deal
+    deal: Deal,
+    targetChannel: string
   ): Promise<void> {
     const isActiveDeal = deal.stage === 'active' || deal.stage === 'in_progress';
     
@@ -282,7 +290,7 @@ export class SlackClient {
     
     // Post Executive Summary header
     await this.client.chat.postMessage({
-      channel: this.channelId,
+      channel: targetChannel,
       thread_ts: threadTs,
       text: '*📋 Executive Summary*',
     });
@@ -301,7 +309,7 @@ export class SlackClient {
       // Post as plain text message ONLY - no blocks at all
       // This ensures full text is displayed without any truncation
       await this.client.chat.postMessage({
-        channel: this.channelId,
+        channel: targetChannel,
         thread_ts: threadTs,
         text: chunk, // Plain text only - no blocks
       });
@@ -314,7 +322,7 @@ export class SlackClient {
     // 2. POST DEAL HEALTH SCORE (if available for active deals)
     if (healthScore !== null && isActiveDeal) {
       await this.client.chat.postMessage({
-        channel: this.channelId,
+        channel: targetChannel,
         thread_ts: threadTs,
         text: `Deal Health Score: ${healthScore}/10`,
         blocks: [
@@ -345,7 +353,7 @@ export class SlackClient {
     // Post header
     const nextStepsHeader = `*${isActiveDeal ? '🎯 Recommended Next Steps' : '💡 Key Learnings'}*`;
     await this.client.chat.postMessage({
-      channel: this.channelId,
+      channel: targetChannel,
       thread_ts: threadTs,
       text: nextStepsHeader,
     });
@@ -362,7 +370,7 @@ export class SlackClient {
       // Post as plain text message ONLY - no blocks at all
       // This ensures full text is displayed without any truncation
       await this.client.chat.postMessage({
-        channel: this.channelId,
+        channel: targetChannel,
         thread_ts: threadTs,
         text: chunk, // Plain text only - no blocks
       });
@@ -436,7 +444,8 @@ export class SlackClient {
   private async postInteractionsTimeline(
     threadTs: string,
     interactions: any[],
-    manualEmails: any[]
+    manualEmails: any[],
+    targetChannel: string
   ): Promise<void> {
     // Combine all interactions
     const allItems = [
@@ -477,7 +486,7 @@ export class SlackClient {
     const emails = allItems.filter(i => i.type === '📧 Email').length;
     
     await this.client.chat.postMessage({
-      channel: this.channelId,
+      channel: targetChannel,
       thread_ts: threadTs,
       text: 'Interaction Timeline',
       blocks: [

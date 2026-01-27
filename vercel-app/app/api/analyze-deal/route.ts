@@ -7,10 +7,13 @@ import {
   getInteractionsForDeal,
   getManualEmailsForDeal,
   createAnalysis,
+  updateDealRoleSegment,
 } from '@/lib/db/client';
 import { buildContext, formatDealInfo, selectPrompt, fillPrompt } from '@/lib/analysis/builder';
 import { ClaudeClient } from '@/lib/claude/client';
 import { SlackClient } from '@/lib/slack/client';
+import { createSalesforceClient } from '@/lib/salesforce/client';
+import { getChannelsForSegment } from '@/lib/slack/routing';
 
 /**
  * Deal Analysis API
@@ -47,18 +50,36 @@ export async function POST(request: NextRequest) {
     console.log('[Analysis] Starting analysis for:', crmId || dealId);
     
     // Fetch deal
-    const deal = crmId 
+    const deal = crmId
       ? await getDealByCrmId(crmId)
       : await getDealById(dealId!);
-    
+
     if (!deal) {
       return NextResponse.json({
         success: false,
         error: 'Deal not found',
       }, { status: 404 });
     }
-    
+
     console.log(`[Analysis] Deal found: ${deal.name} (${deal.stage})`);
+
+    // Fetch latest Role_Segment__c from Salesforce and update deal if changed
+    const salesforceClient = createSalesforceClient();
+    if (salesforceClient && deal.crm_id) {
+      try {
+        const roleSegment = await salesforceClient.getRoleSegment(deal.crm_id);
+        if (roleSegment && roleSegment !== deal.role_segment) {
+          console.log(`[Analysis] Updating role_segment: ${deal.role_segment || 'null'} -> ${roleSegment}`);
+          await updateDealRoleSegment(deal.id, roleSegment);
+          deal.role_segment = roleSegment;
+        } else if (roleSegment) {
+          console.log(`[Analysis] Role segment unchanged: ${roleSegment}`);
+        }
+      } catch (error) {
+        console.error('[Analysis] Failed to fetch Salesforce data:', error);
+        // Continue with analysis even if Salesforce fetch fails
+      }
+    }
     
     // Fetch all interactions (calls + emails)
     const interactions = await getInteractionsForDeal(deal.id);
@@ -109,34 +130,55 @@ export async function POST(request: NextRequest) {
       dbAnalysisType = 'active_health'; // Default
     }
     
-    // Post to Slack
+    // Post to Slack - route to channels based on segment
     let slackThreadTs: string | undefined;
     let slackChannel: string | undefined;
-    
+    const postedChannels: string[] = [];
+
     try {
       const slackClient = new SlackClient(
         process.env.SLACK_BOT_TOKEN!,
         process.env.SLACK_CHANNEL_ID!
       );
-      
-      slackThreadTs = await slackClient.postAnalysis(
-        deal, 
-        {
-          ...analysisResult,
-          id: '', // Will be set after DB insert
-          deal_id: deal.id,
-          analysis_type: dbAnalysisType,
-          exec_summary: analysisResult.execSummary,
-          next_steps: analysisResult.nextSteps,
-          created_at: new Date(),
-        },
-        interactions, // Pass interactions
-        manualEmails // Pass emails
-      );
-      
-      slackChannel = process.env.SLACK_CHANNEL_ID!;
-      
-      console.log('[Analysis] Posted to Slack thread:', slackThreadTs);
+
+      const channels = getChannelsForSegment(deal.role_segment);
+      console.log(`[Analysis] Posting to ${channels.length} channel(s) for segment "${deal.role_segment || 'unknown'}":`, channels);
+
+      const analysisForSlack = {
+        ...analysisResult,
+        id: '', // Will be set after DB insert
+        deal_id: deal.id,
+        analysis_type: dbAnalysisType,
+        exec_summary: analysisResult.execSummary,
+        next_steps: analysisResult.nextSteps,
+        created_at: new Date(),
+      };
+
+      for (const channel of channels) {
+        try {
+          const threadTs = await slackClient.postAnalysis(
+            deal,
+            analysisForSlack,
+            interactions,
+            manualEmails,
+            channel
+          );
+
+          // Track first successful post for DB storage
+          if (!slackThreadTs) {
+            slackThreadTs = threadTs;
+            slackChannel = channel;
+          }
+
+          postedChannels.push(channel);
+          console.log(`[Analysis] Posted to channel ${channel}, thread:`, threadTs);
+        } catch (channelError) {
+          console.error(`[Analysis] Failed to post to channel ${channel}:`, channelError);
+          // Continue to next channel
+        }
+      }
+
+      console.log(`[Analysis] Successfully posted to ${postedChannels.length}/${channels.length} channel(s)`);
     } catch (error) {
       console.error('[Analysis] Failed to post to Slack:', error);
       // Continue even if Slack fails

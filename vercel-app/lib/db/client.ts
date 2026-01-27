@@ -18,12 +18,13 @@ export async function upsertDeal(
     accountName?: string;
     opportunityType?: string;
     ownerName?: string;
+    roleSegment?: string;
   }
 ): Promise<Deal> {
   const result = await sql`
-    INSERT INTO deals (crm_id, name, stage, amount, currency, account_name, opportunity_type, owner_name)
-    VALUES (${crmId}, ${data.name}, ${data.stage}, ${data.amount || null}, ${data.currency || 'USD'}, ${data.accountName || null}, ${data.opportunityType || null}, ${data.ownerName || null})
-    ON CONFLICT (crm_id) 
+    INSERT INTO deals (crm_id, name, stage, amount, currency, account_name, opportunity_type, owner_name, role_segment)
+    VALUES (${crmId}, ${data.name}, ${data.stage}, ${data.amount || null}, ${data.currency || 'USD'}, ${data.accountName || null}, ${data.opportunityType || null}, ${data.ownerName || null}, ${data.roleSegment || null})
+    ON CONFLICT (crm_id)
     DO UPDATE SET
       name = EXCLUDED.name,
       stage = EXCLUDED.stage,
@@ -32,10 +33,11 @@ export async function upsertDeal(
       account_name = COALESCE(EXCLUDED.account_name, deals.account_name),
       opportunity_type = COALESCE(EXCLUDED.opportunity_type, deals.opportunity_type),
       owner_name = COALESCE(EXCLUDED.owner_name, deals.owner_name),
+      role_segment = COALESCE(EXCLUDED.role_segment, deals.role_segment),
       updated_at = NOW()
     RETURNING *
   `;
-  
+
   return result.rows[0] as Deal;
 }
 
@@ -57,8 +59,19 @@ export async function getDealById(id: string): Promise<Deal | null> {
   const result = await sql`
     SELECT * FROM deals WHERE id = ${id}
   `;
-  
+
   return result.rows[0] as Deal || null;
+}
+
+/**
+ * Update role_segment for a deal
+ */
+export async function updateDealRoleSegment(dealId: string, roleSegment: string): Promise<void> {
+  await sql`
+    UPDATE deals
+    SET role_segment = ${roleSegment}, updated_at = NOW()
+    WHERE id = ${dealId}
+  `;
 }
 
 /**
