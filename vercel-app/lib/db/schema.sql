@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS deals (
   opportunity_type VARCHAR(100),
   owner_name VARCHAR(255),
   role_segment VARCHAR(100),
+  arr DECIMAL(15, 2),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

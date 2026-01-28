@@ -75,6 +75,34 @@ export async function updateDealRoleSegment(dealId: string, roleSegment: string)
 }
 
 /**
+ * Update Salesforce fields (role_segment and arr) for a deal
+ */
+export async function updateDealSalesforceFields(
+  dealId: string,
+  fields: { roleSegment?: string; arr?: number }
+): Promise<void> {
+  if (fields.roleSegment !== undefined && fields.arr !== undefined) {
+    await sql`
+      UPDATE deals
+      SET role_segment = ${fields.roleSegment}, arr = ${fields.arr}, updated_at = NOW()
+      WHERE id = ${dealId}
+    `;
+  } else if (fields.roleSegment !== undefined) {
+    await sql`
+      UPDATE deals
+      SET role_segment = ${fields.roleSegment}, updated_at = NOW()
+      WHERE id = ${dealId}
+    `;
+  } else if (fields.arr !== undefined) {
+    await sql`
+      UPDATE deals
+      SET arr = ${fields.arr}, updated_at = NOW()
+      WHERE id = ${dealId}
+    `;
+  }
+}
+
+/**
  * Create an interaction (call or email)
  */
 export async function createInteraction(

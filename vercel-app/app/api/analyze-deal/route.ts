@@ -7,7 +7,7 @@ import {
   getInteractionsForDeal,
   getManualEmailsForDeal,
   createAnalysis,
-  updateDealRoleSegment,
+  updateDealSalesforceFields,
 } from '@/lib/db/client';
 import { buildContext, formatDealInfo, selectPrompt, fillPrompt } from '@/lib/analysis/builder';
 import { ClaudeClient } from '@/lib/claude/client';
@@ -63,17 +63,27 @@ export async function POST(request: NextRequest) {
 
     console.log(`[Analysis] Deal found: ${deal.name} (${deal.stage})`);
 
-    // Fetch latest Role_Segment__c from Salesforce and update deal if changed
+    // Fetch latest fields from Salesforce and update deal if changed
     const salesforceClient = createSalesforceClient();
     if (salesforceClient && deal.crm_id) {
       try {
-        const roleSegment = await salesforceClient.getRoleSegment(deal.crm_id);
-        if (roleSegment && roleSegment !== deal.role_segment) {
-          console.log(`[Analysis] Updating role_segment: ${deal.role_segment || 'null'} -> ${roleSegment}`);
-          await updateDealRoleSegment(deal.id, roleSegment);
-          deal.role_segment = roleSegment;
-        } else if (roleSegment) {
-          console.log(`[Analysis] Role segment unchanged: ${roleSegment}`);
+        const sfFields = await salesforceClient.getOpportunityFields(deal.crm_id);
+        const updates: { roleSegment?: string; arr?: number } = {};
+
+        if (sfFields.roleSegment && sfFields.roleSegment !== deal.role_segment) {
+          console.log(`[Analysis] Updating role_segment: ${deal.role_segment || 'null'} -> ${sfFields.roleSegment}`);
+          updates.roleSegment = sfFields.roleSegment;
+          deal.role_segment = sfFields.roleSegment;
+        }
+
+        if (sfFields.arr !== null && sfFields.arr !== deal.arr) {
+          console.log(`[Analysis] Updating ARR: ${deal.arr || 'null'} -> ${sfFields.arr}`);
+          updates.arr = sfFields.arr;
+          deal.arr = sfFields.arr;
+        }
+
+        if (Object.keys(updates).length > 0) {
+          await updateDealSalesforceFields(deal.id, updates);
         }
       } catch (error) {
         console.error('[Analysis] Failed to fetch Salesforce data:', error);

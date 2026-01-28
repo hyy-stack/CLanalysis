@@ -116,6 +116,10 @@ export function formatDealInfo(deal: Deal): string {
 **Account**: ${deal.account_name || 'N/A'}
 **Value**: ${deal.amount ? `${deal.currency || '$'}${deal.amount.toLocaleString()}` : 'N/A'}`;
 
+  if (deal.arr) {
+    info += `\n**ARR**: $${deal.arr.toLocaleString()}`;
+  }
+
   if (deal.role_segment) {
     info += `\n**Role Segment**: ${deal.role_segment}`;
   }

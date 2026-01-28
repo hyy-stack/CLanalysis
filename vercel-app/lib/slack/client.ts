@@ -85,6 +85,10 @@ export class SlackClient {
         type: 'mrkdwn',
         text: `*Value*\n${deal.amount ? `${deal.currency || '$'}${deal.amount.toLocaleString()}` : 'TBD'}`,
       },
+      ...(deal.arr ? [{
+        type: 'mrkdwn',
+        text: `*ARR*\n$${deal.arr.toLocaleString()}`,
+      }] : []),
       ...(deal.role_segment ? [{
         type: 'mrkdwn',
         text: `*Segment*\n${deal.role_segment}`,

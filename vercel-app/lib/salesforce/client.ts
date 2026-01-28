@@ -16,6 +16,7 @@ interface SalesforceOpportunity {
   StageName: string;
   Amount?: number;
   Role_Segment__c?: string;
+  ARR__c?: number;
 }
 
 export class SalesforceClient {
@@ -102,8 +103,8 @@ export class SalesforceClient {
     console.log(`[Salesforce] Fetching opportunity: ${opportunityId}`);
 
     try {
-      // Query specific fields including Role_Segment__c
-      const fields = ['Id', 'Name', 'StageName', 'Amount', 'Role_Segment__c'].join(',');
+      // Query specific fields including Role_Segment__c and ARR__c
+      const fields = ['Id', 'Name', 'StageName', 'Amount', 'Role_Segment__c', 'ARR__c'].join(',');
       const endpoint = `/services/data/v59.0/sobjects/Opportunity/${opportunityId}?fields=${fields}`;
 
       const opportunity = await this.request<SalesforceOpportunity>(endpoint);
@@ -122,6 +123,17 @@ export class SalesforceClient {
   async getRoleSegment(opportunityId: string): Promise<string | null> {
     const opportunity = await this.getOpportunity(opportunityId);
     return opportunity?.Role_Segment__c || null;
+  }
+
+  /**
+   * Fetch Role_Segment__c and ARR__c for an Opportunity
+   */
+  async getOpportunityFields(opportunityId: string): Promise<{ roleSegment: string | null; arr: number | null }> {
+    const opportunity = await this.getOpportunity(opportunityId);
+    return {
+      roleSegment: opportunity?.Role_Segment__c || null,
+      arr: opportunity?.ARR__c || null,
+    };
   }
 }
 
