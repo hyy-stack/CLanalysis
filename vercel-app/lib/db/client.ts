@@ -75,16 +75,54 @@ export async function updateDealRoleSegment(dealId: string, roleSegment: string)
 }
 
 /**
- * Update Salesforce fields (role_segment and arr) for a deal
+ * Update Salesforce fields for a deal
  */
 export async function updateDealSalesforceFields(
   dealId: string,
-  fields: { roleSegment?: string; arr?: number }
+  fields: { roleSegment?: string; arr?: number; ownerName?: string }
 ): Promise<void> {
-  if (fields.roleSegment !== undefined && fields.arr !== undefined) {
+  // Build dynamic update - only update fields that are provided
+  const updates: string[] = [];
+  const values: any[] = [];
+
+  if (fields.roleSegment !== undefined) {
+    updates.push('role_segment');
+    values.push(fields.roleSegment);
+  }
+  if (fields.arr !== undefined) {
+    updates.push('arr');
+    values.push(fields.arr);
+  }
+  if (fields.ownerName !== undefined) {
+    updates.push('owner_name');
+    values.push(fields.ownerName);
+  }
+
+  if (updates.length === 0) return;
+
+  // Use individual queries based on what's being updated
+  if (fields.roleSegment !== undefined && fields.arr !== undefined && fields.ownerName !== undefined) {
+    await sql`
+      UPDATE deals
+      SET role_segment = ${fields.roleSegment}, arr = ${fields.arr}, owner_name = ${fields.ownerName}, updated_at = NOW()
+      WHERE id = ${dealId}
+    `;
+  } else if (fields.roleSegment !== undefined && fields.arr !== undefined) {
     await sql`
       UPDATE deals
       SET role_segment = ${fields.roleSegment}, arr = ${fields.arr}, updated_at = NOW()
+      WHERE id = ${dealId}
+    `;
+  } else if (fields.roleSegment !== undefined && fields.ownerName !== undefined) {
+    await sql`
+      UPDATE deals
+      SET role_segment = ${fields.roleSegment}, owner_name = ${fields.ownerName}, updated_at = NOW()
+      WHERE id = ${dealId}
+    `;
+  } else if (fields.arr !== undefined && fields.ownerName !== undefined) {
+    await sql`
+      UPDATE deals
+      SET arr = ${fields.arr}, owner_name = ${fields.ownerName}, updated_at = NOW()
       WHERE id = ${dealId}
     `;
   } else if (fields.roleSegment !== undefined) {
@@ -97,6 +135,12 @@ export async function updateDealSalesforceFields(
     await sql`
       UPDATE deals
       SET arr = ${fields.arr}, updated_at = NOW()
+      WHERE id = ${dealId}
+    `;
+  } else if (fields.ownerName !== undefined) {
+    await sql`
+      UPDATE deals
+      SET owner_name = ${fields.ownerName}, updated_at = NOW()
       WHERE id = ${dealId}
     `;
   }

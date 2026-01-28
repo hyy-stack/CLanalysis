@@ -17,6 +17,9 @@ interface SalesforceOpportunity {
   Amount?: number;
   Role_Segment__c?: string;
   ARR__c?: number;
+  Owner?: {
+    Name?: string;
+  };
 }
 
 export class SalesforceClient {
@@ -103,8 +106,8 @@ export class SalesforceClient {
     console.log(`[Salesforce] Fetching opportunity: ${opportunityId}`);
 
     try {
-      // Query specific fields including Role_Segment__c and ARR__c
-      const fields = ['Id', 'Name', 'StageName', 'Amount', 'Role_Segment__c', 'ARR__c'].join(',');
+      // Query specific fields including Role_Segment__c, ARR__c, and Owner.Name
+      const fields = ['Id', 'Name', 'StageName', 'Amount', 'Role_Segment__c', 'ARR__c', 'Owner.Name'].join(',');
       const endpoint = `/services/data/v59.0/sobjects/Opportunity/${opportunityId}?fields=${fields}`;
 
       const opportunity = await this.request<SalesforceOpportunity>(endpoint);
@@ -126,13 +129,18 @@ export class SalesforceClient {
   }
 
   /**
-   * Fetch Role_Segment__c and ARR__c for an Opportunity
+   * Fetch key fields from an Opportunity
    */
-  async getOpportunityFields(opportunityId: string): Promise<{ roleSegment: string | null; arr: number | null }> {
+  async getOpportunityFields(opportunityId: string): Promise<{
+    roleSegment: string | null;
+    arr: number | null;
+    ownerName: string | null;
+  }> {
     const opportunity = await this.getOpportunity(opportunityId);
     return {
       roleSegment: opportunity?.Role_Segment__c || null,
       arr: opportunity?.ARR__c || null,
+      ownerName: opportunity?.Owner?.Name || null,
     };
   }
 }

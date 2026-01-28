@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
     if (salesforceClient && deal.crm_id) {
       try {
         const sfFields = await salesforceClient.getOpportunityFields(deal.crm_id);
-        const updates: { roleSegment?: string; arr?: number } = {};
+        const updates: { roleSegment?: string; arr?: number; ownerName?: string } = {};
 
         if (sfFields.roleSegment && sfFields.roleSegment !== deal.role_segment) {
           console.log(`[Analysis] Updating role_segment: ${deal.role_segment || 'null'} -> ${sfFields.roleSegment}`);
@@ -80,6 +80,12 @@ export async function POST(request: NextRequest) {
           console.log(`[Analysis] Updating ARR: ${deal.arr || 'null'} -> ${sfFields.arr}`);
           updates.arr = sfFields.arr;
           deal.arr = sfFields.arr;
+        }
+
+        if (sfFields.ownerName && sfFields.ownerName !== deal.owner_name) {
+          console.log(`[Analysis] Updating owner_name: ${deal.owner_name || 'null'} -> ${sfFields.ownerName}`);
+          updates.ownerName = sfFields.ownerName;
+          deal.owner_name = sfFields.ownerName;
         }
 
         if (Object.keys(updates).length > 0) {
