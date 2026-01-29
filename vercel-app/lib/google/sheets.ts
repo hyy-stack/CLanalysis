@@ -167,8 +167,15 @@ export class GoogleSheetsClient {
  */
 export function createGoogleSheetsClient(): GoogleSheetsClient | null {
   const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
-  const privateKey = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n');
   const spreadsheetId = process.env.GOOGLE_SPREADSHEET_ID;
+
+  // Support both base64-encoded key (GOOGLE_PRIVATE_KEY_BASE64) and raw key (GOOGLE_PRIVATE_KEY)
+  let privateKey: string | undefined;
+  if (process.env.GOOGLE_PRIVATE_KEY_BASE64) {
+    privateKey = Buffer.from(process.env.GOOGLE_PRIVATE_KEY_BASE64, 'base64').toString('utf-8');
+  } else {
+    privateKey = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n');
+  }
 
   if (!email || !privateKey || !spreadsheetId) {
     console.warn('[Google Sheets] Missing required environment variables');
