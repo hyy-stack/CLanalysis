@@ -230,6 +230,7 @@ IMPORTANT: You MUST output a JSON block at the very beginning of your response w
 ```json
 {
   "dealHealthScore": <number 1-10>,
+  "probability": <number 0-100, your estimated probability this deal will close based on the analysis>,
   "momentum": "<Accelerating|Steady|Decelerating|Stalled>",
   "confidenceLevel": "<High|Medium|Low>",
   "buyerScenario": "<Greenfield|Rip-and-Replace|Unknown>",

@@ -71,11 +71,18 @@ export async function POST(request: NextRequest) {
 
     // Get deal from DB to fetch latest analysis
     const deal = await getDealByCrmId(crmId);
-    let analysisFields = {
-      dealSummary,
-      currentNextSteps,
-      untappedOpportunities,
-      risks,
+    let analysisFields: {
+      dealSummary: string;
+      currentNextSteps: string;
+      untappedOpportunities: string;
+      risks: string;
+      anrokProbability: number | null;
+    } = {
+      dealSummary: dealSummary || '',
+      currentNextSteps: currentNextSteps || '',
+      untappedOpportunities: untappedOpportunities || '',
+      risks: risks || '',
+      anrokProbability: null,
     };
 
     // If fields not provided in request, try to get from latest analysis
@@ -90,6 +97,7 @@ export async function POST(request: NextRequest) {
             currentNextSteps: currentNextSteps || structured.currentNextSteps || '',
             untappedOpportunities: untappedOpportunities || structured.untappedOpportunities || '',
             risks: risks || structured.criticalIssues?.join(', ') || '',
+            anrokProbability: structured.probability ?? null,
           };
         } else {
           // Fall back to exec_summary and next_steps from non-structured analysis
@@ -99,6 +107,7 @@ export async function POST(request: NextRequest) {
             currentNextSteps: currentNextSteps || latestAnalysis.next_steps || '',
             untappedOpportunities: untappedOpportunities || '',
             risks: risks || '',
+            anrokProbability: null,
           };
         }
       }
@@ -113,7 +122,7 @@ export async function POST(request: NextRequest) {
       arr: sfFields.arr,
       closeDate: sfFields.closeDate,
       oppStage: sfFields.stageName || '',
-      probability: sfFields.probability,
+      sfdcProbability: sfFields.probability,
       ...analysisFields,
     });
 

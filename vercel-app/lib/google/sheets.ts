@@ -12,7 +12,8 @@ interface DealTrackingData {
   arr: number | null;
   closeDate: string | null;
   oppStage: string;
-  probability: number | null;
+  sfdcProbability: number | null;
+  anrokProbability?: number | null; // Claude's probability assessment
   // These would come from Claude analysis
   dealSummary?: string;
   currentNextSteps?: string;
@@ -58,13 +59,14 @@ export class GoogleSheetsClient {
       data.arr ? data.arr.toString() : '',
       data.closeDate || '',
       data.oppStage,
-      data.probability ? data.probability.toString() : '',
+      data.anrokProbability != null ? data.anrokProbability.toString() : '', // Column L: Anrok Probability
+      data.sfdcProbability != null ? data.sfdcProbability.toString() : '', // Column M: SFDC Probability
     ];
 
     try {
       await this.sheets.spreadsheets.values.append({
         spreadsheetId: this.spreadsheetId,
-        range: `${sheetName}!A:L`,
+        range: `${sheetName}!A:M`,
         valueInputOption: 'USER_ENTERED',
         requestBody: {
           values: [row],
@@ -113,14 +115,15 @@ export class GoogleSheetsClient {
         data.arr ? data.arr.toString() : '',
         data.closeDate || '',
         data.oppStage,
-        data.probability ? data.probability.toString() : '',
+        data.anrokProbability != null ? data.anrokProbability.toString() : '', // Column L: Anrok Probability
+        data.sfdcProbability != null ? data.sfdcProbability.toString() : '', // Column M: SFDC Probability
       ];
 
       if (rowIndex > 0) {
         // Update existing row
         await this.sheets.spreadsheets.values.update({
           spreadsheetId: this.spreadsheetId,
-          range: `${sheetName}!A${rowIndex}:L${rowIndex}`,
+          range: `${sheetName}!A${rowIndex}:M${rowIndex}`,
           valueInputOption: 'USER_ENTERED',
           requestBody: {
             values: [row],
@@ -131,7 +134,7 @@ export class GoogleSheetsClient {
         // Append new row
         await this.sheets.spreadsheets.values.append({
           spreadsheetId: this.spreadsheetId,
-          range: `${sheetName}!A:L`,
+          range: `${sheetName}!A:M`,
           valueInputOption: 'USER_ENTERED',
           requestBody: {
             values: [row],

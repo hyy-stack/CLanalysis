@@ -63,6 +63,7 @@ export interface Analysis {
  */
 export interface ComEnhancedStructuredData {
   dealHealthScore: number;
+  probability: number; // 0-100 probability of close
   momentum: 'Accelerating' | 'Steady' | 'Decelerating' | 'Stalled';
   confidenceLevel: 'High' | 'Medium' | 'Low';
   buyerScenario: 'Greenfield' | 'Rip-and-Replace' | 'Unknown';
