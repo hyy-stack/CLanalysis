@@ -48,12 +48,49 @@ export interface ManualEmail {
 export interface Analysis {
   id: string;
   deal_id: string;
-  analysis_type: 'active_health' | 'closed_lost' | 'closed_won' | 'customer_sentiment';
+  analysis_type: 'active_health' | 'closed_lost' | 'closed_won' | 'customer_sentiment' | 'com_enhanced';
   exec_summary: string;
   next_steps: string;
   details: any;
+  structured_data?: ComEnhancedStructuredData;
   slack_thread_ts?: string;
   slack_channel?: string;
   created_at: Date;
+}
+
+/**
+ * Structured data from Command of Message Enhanced Analysis
+ */
+export interface ComEnhancedStructuredData {
+  dealHealthScore: number;
+  momentum: 'Accelerating' | 'Steady' | 'Decelerating' | 'Stalled';
+  confidenceLevel: 'High' | 'Medium' | 'Low';
+  buyerScenario: 'Greenfield' | 'Rip-and-Replace' | 'Unknown';
+  primaryValueDriver: 'Risk' | 'Scale' | 'Global' | 'Unknown';
+  decisionStage: 'Early Discovery' | 'Evaluation' | 'Selection' | 'Negotiation';
+  discoveryExecution: 'Strong' | 'Adequate' | 'Weak';
+  valueAlignment: 'Aligned' | 'Partial' | 'Misaligned';
+  competitivePosition: 'Strong' | 'Neutral' | 'At Risk' | 'Unknown';
+  differentiators: {
+    big4TaxExpertise: DifferentiatorAssessment;
+    auditReadyAI: DifferentiatorAssessment;
+    globalCoverage: DifferentiatorAssessment;
+    fastImplementation: DifferentiatorAssessment;
+    enterpriseSecurity: DifferentiatorAssessment;
+    modernExperience: DifferentiatorAssessment;
+  };
+  positiveIndicators: string[];
+  criticalIssues: string[];
+  mediumRisks: string[];
+  minorConcerns: string[];
+  currentNextSteps: string;
+  untappedOpportunities: string;
+  dealSummary: string;
+}
+
+export interface DifferentiatorAssessment {
+  relevant: 'High' | 'Medium' | 'Low' | 'N/A';
+  positioned: 'Yes' | 'Partially' | 'No';
+  proofPoint: boolean;
 }
 

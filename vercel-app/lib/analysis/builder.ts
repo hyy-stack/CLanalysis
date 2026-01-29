@@ -163,3 +163,12 @@ export function fillPrompt(
     .replace(/\{\{CALL_TRANSCRIPTS\}\}/g, context);
 }
 
+/**
+ * Load a specific prompt by name
+ */
+export async function loadPrompt(promptName: string): Promise<string> {
+  const promptsDir = join(process.cwd(), 'prompts');
+  const promptPath = join(promptsDir, promptName);
+  return readFile(promptPath, 'utf-8');
+}
+

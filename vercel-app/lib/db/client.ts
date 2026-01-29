@@ -364,11 +364,12 @@ export async function createManualEmail(
  */
 export async function createAnalysis(
   dealId: string,
-  analysisType: 'active_health' | 'closed_lost' | 'closed_won' | 'customer_sentiment',
+  analysisType: 'active_health' | 'closed_lost' | 'closed_won' | 'customer_sentiment' | 'com_enhanced',
   data: {
     execSummary: string;
     nextSteps: string;
     details: any;
+    structuredData?: any;
     slackThreadTs?: string;
     slackChannel?: string;
   }
@@ -376,15 +377,16 @@ export async function createAnalysis(
   const result = await sql`
     INSERT INTO analyses (
       deal_id, analysis_type, exec_summary, next_steps, details,
-      slack_thread_ts, slack_channel
+      structured_data, slack_thread_ts, slack_channel
     )
     VALUES (
       ${dealId}, ${analysisType}, ${data.execSummary}, ${data.nextSteps},
-      ${JSON.stringify(data.details)}, ${data.slackThreadTs || null}, ${data.slackChannel || null}
+      ${JSON.stringify(data.details)}, ${data.structuredData ? JSON.stringify(data.structuredData) : null},
+      ${data.slackThreadTs || null}, ${data.slackChannel || null}
     )
     RETURNING *
   `;
-  
+
   return result.rows[0] as Analysis;
 }
 
