@@ -17,7 +17,12 @@ interface SalesforceOpportunity {
   Amount?: number;
   Role_Segment__c?: string;
   ARR__c?: number;
+  CloseDate?: string;
+  Probability?: number;
   Owner?: {
+    Name?: string;
+  };
+  Account?: {
     Name?: string;
   };
 }
@@ -106,8 +111,11 @@ export class SalesforceClient {
     console.log(`[Salesforce] Fetching opportunity: ${opportunityId}`);
 
     try {
-      // Query specific fields including Role_Segment__c, ARR__c, and Owner.Name
-      const fields = ['Id', 'Name', 'StageName', 'Amount', 'Role_Segment__c', 'ARR__c', 'Owner.Name'].join(',');
+      // Query specific fields for deal tracking
+      const fields = [
+        'Id', 'Name', 'StageName', 'Amount', 'Role_Segment__c', 'ARR__c',
+        'CloseDate', 'Probability', 'Owner.Name', 'Account.Name'
+      ].join(',');
       const endpoint = `/services/data/v59.0/sobjects/Opportunity/${opportunityId}?fields=${fields}`;
 
       const opportunity = await this.request<SalesforceOpportunity>(endpoint);
@@ -135,12 +143,20 @@ export class SalesforceClient {
     roleSegment: string | null;
     arr: number | null;
     ownerName: string | null;
+    accountName: string | null;
+    closeDate: string | null;
+    stageName: string | null;
+    probability: number | null;
   }> {
     const opportunity = await this.getOpportunity(opportunityId);
     return {
       roleSegment: opportunity?.Role_Segment__c || null,
       arr: opportunity?.ARR__c || null,
       ownerName: opportunity?.Owner?.Name || null,
+      accountName: opportunity?.Account?.Name || null,
+      closeDate: opportunity?.CloseDate || null,
+      stageName: opportunity?.StageName || null,
+      probability: opportunity?.Probability || null,
     };
   }
 }
