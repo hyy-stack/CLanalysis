@@ -43,35 +43,57 @@ export class GoogleSheetsClient {
 
   /**
    * Append a row of deal tracking data to the sheet
+   * Skips column D (Manager) to preserve any formulas there
    */
   async appendDealTracking(data: DealTrackingData, sheetName: string = 'Raw Data'): Promise<void> {
     console.log(`[Google Sheets] Appending deal tracking for: ${data.opportunity}`);
 
-    const row = [
+    // First, append a row with just columns A-C
+    const rowAC = [
       data.opportunity,
       data.account,
       data.opportunityOwner,
-      '', // Manager - to be filled manually or later
-      data.dealSummary || '',
-      data.currentNextSteps || '',
-      data.untappedOpportunities || '',
-      data.risks || '',
-      data.arr ? data.arr.toString() : '',
-      data.closeDate || '',
-      data.oppStage,
-      data.anrokProbability != null ? data.anrokProbability.toString() : '', // Column L: Anrok Probability
-      data.sfdcProbability != null ? data.sfdcProbability.toString() : '', // Column M: SFDC Probability
     ];
 
     try {
-      await this.sheets.spreadsheets.values.append({
+      // Append creates a new row - we need to find where it landed to update E-M
+      const appendResponse = await this.sheets.spreadsheets.values.append({
         spreadsheetId: this.spreadsheetId,
-        range: `${sheetName}!A:M`,
+        range: `${sheetName}!A:C`,
         valueInputOption: 'USER_ENTERED',
         requestBody: {
-          values: [row],
+          values: [rowAC],
         },
       });
+
+      // Extract the row number from the updated range (e.g., "Raw Data!A5:C5" -> 5)
+      const updatedRange = appendResponse.data.updates?.updatedRange || '';
+      const rowMatch = updatedRange.match(/!A(\d+):/);
+      const rowNumber = rowMatch ? parseInt(rowMatch[1]) : null;
+
+      if (rowNumber) {
+        // Now update columns E-M for that row (skipping D which has formula)
+        const rowEM = [
+          data.dealSummary || '',
+          data.currentNextSteps || '',
+          data.untappedOpportunities || '',
+          data.risks || '',
+          data.arr ? data.arr.toString() : '',
+          data.closeDate || '',
+          data.oppStage,
+          data.anrokProbability != null ? data.anrokProbability.toString() : '',
+          data.sfdcProbability != null ? data.sfdcProbability.toString() : '',
+        ];
+
+        await this.sheets.spreadsheets.values.update({
+          spreadsheetId: this.spreadsheetId,
+          range: `${sheetName}!E${rowNumber}:M${rowNumber}`,
+          valueInputOption: 'USER_ENTERED',
+          requestBody: {
+            values: [rowEM],
+          },
+        });
+      }
 
       console.log('[Google Sheets] Successfully appended row');
     } catch (error) {
@@ -82,6 +104,7 @@ export class GoogleSheetsClient {
 
   /**
    * Update or insert a deal row (upsert by opportunity name)
+   * Skips column D (Manager) to preserve any formulas there
    */
   async upsertDealTracking(data: DealTrackingData, sheetName: string = 'Raw Data'): Promise<void> {
     console.log(`[Google Sheets] Upserting deal tracking for: ${data.opportunity}`);
@@ -103,11 +126,15 @@ export class GoogleSheetsClient {
         }
       }
 
-      const row = [
+      // Columns A-C (skip D which has Manager formula)
+      const rowAC = [
         data.opportunity,
         data.account,
         data.opportunityOwner,
-        '', // Manager
+      ];
+
+      // Columns E-M (everything after Manager)
+      const rowEM = [
         data.dealSummary || '',
         data.currentNextSteps || '',
         data.untappedOpportunities || '',
@@ -115,32 +142,34 @@ export class GoogleSheetsClient {
         data.arr ? data.arr.toString() : '',
         data.closeDate || '',
         data.oppStage,
-        data.anrokProbability != null ? data.anrokProbability.toString() : '', // Column L: Anrok Probability
-        data.sfdcProbability != null ? data.sfdcProbability.toString() : '', // Column M: SFDC Probability
+        data.anrokProbability != null ? data.anrokProbability.toString() : '',
+        data.sfdcProbability != null ? data.sfdcProbability.toString() : '',
       ];
 
       if (rowIndex > 0) {
-        // Update existing row
+        // Update existing row - write A-C and E-M separately to skip D
         await this.sheets.spreadsheets.values.update({
           spreadsheetId: this.spreadsheetId,
-          range: `${sheetName}!A${rowIndex}:M${rowIndex}`,
+          range: `${sheetName}!A${rowIndex}:C${rowIndex}`,
           valueInputOption: 'USER_ENTERED',
           requestBody: {
-            values: [row],
+            values: [rowAC],
           },
         });
+
+        await this.sheets.spreadsheets.values.update({
+          spreadsheetId: this.spreadsheetId,
+          range: `${sheetName}!E${rowIndex}:M${rowIndex}`,
+          valueInputOption: 'USER_ENTERED',
+          requestBody: {
+            values: [rowEM],
+          },
+        });
+
         console.log(`[Google Sheets] Updated existing row ${rowIndex}`);
       } else {
-        // Append new row
-        await this.sheets.spreadsheets.values.append({
-          spreadsheetId: this.spreadsheetId,
-          range: `${sheetName}!A:M`,
-          valueInputOption: 'USER_ENTERED',
-          requestBody: {
-            values: [row],
-          },
-        });
-        console.log('[Google Sheets] Appended new row');
+        // Append new row using the appendDealTracking method
+        await this.appendDealTracking(data, sheetName);
       }
     } catch (error) {
       console.error('[Google Sheets] Failed to upsert row:', error);

@@ -263,9 +263,9 @@ IMPORTANT: You MUST output a JSON block at the very beginning of your response w
   "criticalIssues": ["<issue1>"],
   "mediumRisks": ["<risk1>"],
   "minorConcerns": ["<concern1>"],
-  "currentNextSteps": "<bullet points of committed next steps, include person name and title when available, e.g. '• Sarah Chen (VP Finance) to review proposal by Friday'>",
-  "untappedOpportunities": "<bullet points of key opportunities to strengthen the deal, be specific about what to do and why>",
-  "dealSummary": "<3-5 bullet points summarizing: deal health, key momentum indicators, primary risks, and recommended focus areas>"
+  "currentNextSteps": "<bullet points on separate lines using \\n, include person name and title when available, e.g. '• Sarah Chen (VP Finance) to review proposal by Friday\\n• Team to send technical specs by Monday'>",
+  "untappedOpportunities": "<bullet points on separate lines using \\n, be specific about what to do and why, e.g. '• Position Big4 expertise for audit concerns\\n• Leverage case study for similar migration'>",
+  "dealSummary": "<3-5 bullet points on separate lines using \\n, e.g. '• Deal health: 6/10, steady momentum\\n• Key risk: competitive pressure from Avalara\\n• Focus: establish differentiation before final eval'>"
 }
 ```
 
