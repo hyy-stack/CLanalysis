@@ -289,14 +289,12 @@ Then provide the full analysis:
 - [Which driver rep is selling to vs. what buyer actually cares about]
 
 **Differentiator Coverage**:
-| Differentiator | Relevant? | Positioned? | Proof Point? |
-|----------------|-----------|-------------|--------------|
-| Big4 Tax Expertise | | | |
-| Audit-Ready & AI Accuracy | | | |
-| Global Coverage | | | |
-| Fast Implementation | | | |
-| Enterprise Scale & Security | | | |
-| Modern Software Experience | | | |
+• Big4 Tax Expertise: [Relevant: High/Med/Low] [Positioned: Yes/Partially/No] [Proof Point: Yes/No]
+• Audit-Ready & AI Accuracy: [Relevant: High/Med/Low] [Positioned: Yes/Partially/No] [Proof Point: Yes/No]
+• Global Coverage: [Relevant: High/Med/Low] [Positioned: Yes/Partially/No] [Proof Point: Yes/No]
+• Fast Implementation: [Relevant: High/Med/Low] [Positioned: Yes/Partially/No] [Proof Point: Yes/No]
+• Enterprise Scale & Security: [Relevant: High/Med/Low] [Positioned: Yes/Partially/No] [Proof Point: Yes/No]
+• Modern Software Experience: [Relevant: High/Med/Low] [Positioned: Yes/Partially/No] [Proof Point: Yes/No]
 
 **Competitive Position**: [Strong / Neutral / At Risk / Unknown]
 - [If competitor in play: trap question usage assessment]
@@ -325,29 +323,28 @@ Then provide the full analysis:
 ### Untapped Opportunities
 Based on CoM gaps identified, these actions could strengthen the deal:
 
-1. **[Opportunity]**: [Specific action + why it matters]
-   - Suggested approach: [How to execute]
+• *[Opportunity]*: [Specific action + why it matters]
+  → Suggested approach: [How to execute]
 
-2. **[Opportunity]**: [Specific action + why it matters]
-   - Suggested approach: [How to execute]
+• *[Opportunity]*: [Specific action + why it matters]
+  → Suggested approach: [How to execute]
 
 [Continue as needed - prioritize by impact]
 
 ### Risks & Probability
 
-| Risk | Probability | Impact | Mitigation |
-|------|-------------|--------|------------|
-| [Specific risk] | [High/Med/Low] | [What happens if realized] | [Specific action to prevent] |
+• *[Specific risk]* - Probability: [High/Med/Low] - Impact: [What happens if realized]
+  → Mitigation: [Specific action to prevent]
 
 ---
 
 ## Analysis Principles
 
-1. **Be Honest**: Call out methodology gaps, don't assume rep did something if not in transcript
-2. **Be Specific**: Quote buyer language when assessing discovery quality
-3. **Be Actionable**: Every gap should have a specific remedy
-4. **Connect to Framework**: Recommendations should reference specific differentiators, trap questions, or proof points
-5. **Coach, Don't Judge**: Frame gaps as opportunities, not failures
+• *Be Honest*: Call out methodology gaps, don't assume rep did something if not in transcript
+• *Be Specific*: Quote buyer language when assessing discovery quality
+• *Be Actionable*: Every gap should have a specific remedy
+• *Connect to Framework*: Recommendations should reference specific differentiators, trap questions, or proof points
+• *Coach, Don't Judge*: Frame gaps as opportunities, not failures
 
 ---
 

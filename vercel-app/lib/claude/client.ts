@@ -62,10 +62,17 @@ export class ClaudeClient {
    * Looks for common headers and extracts content
    */
   private parseResponse(markdown: string): Omit<ClaudeAnalysisResult, 'fullResponse'> {
+    // Strip any JSON block at the start of the response (used by CoM Enhanced prompt for structured data)
+    const jsonBlockMatch = markdown.match(/^```json\s*[\s\S]*?```\s*/);
+    if (jsonBlockMatch) {
+      markdown = markdown.substring(jsonBlockMatch[0].length).trim();
+      console.log(`[Claude] Stripped JSON block (${jsonBlockMatch[0].length} chars) from response`);
+    }
+
     // Extract executive summary - capture everything from "Executive Summary" until "Next Steps" or similar
     // This includes subsections like "Deal Health Assessment" that are formatted as ### headers
     // but are actually part of the Executive Summary section
-    
+
     // Debug: Log all headers found in the response
     const allHeaders = markdown.match(/^#{1,3}\s+.+$/gm) || [];
     console.log(`[Claude] Found ${allHeaders.length} headers in response:`, allHeaders.slice(0, 10));
