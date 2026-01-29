@@ -215,14 +215,36 @@ export class ClaudeClient {
     }
     
     // Extract next steps / recommendations - improved regex
-    const nextStepsMatch = markdown.match(/###?\s*(?:Next Steps|Recommendations|Critical Recommendations|Key Learnings)[\s\S]*?\n\n([\s\S]*?)(?=\n###\s+(?!.*\n##)|$)/i);
+    // Includes CoM Enhanced prompt sections: "Current Next Steps" and "Untapped Opportunities"
+    const nextStepsMatch = markdown.match(/###?\s*(?:Current Next Steps|Untapped Opportunities|Next Steps|Recommendations|Critical Recommendations)[\s\S]*?\n\n([\s\S]*?)(?=\n###\s+(?!.*\n##)|$)/i);
     let nextSteps = nextStepsMatch ? nextStepsMatch[1].trim() : '';
-    
+
     // If regex didn't match, try sections
     if (!nextSteps || nextSteps.length < 50) {
       const sections = this.extractSections(markdown);
-      if (sections['Next Steps'] || sections['Recommendations'] || sections['Critical Recommendations']) {
-        nextSteps = sections['Next Steps'] || sections['Recommendations'] || sections['Critical Recommendations'];
+      // Try CoM Enhanced sections first, then fall back to standard sections
+      nextSteps = sections['Current Next Steps'] ||
+                  sections['Untapped Opportunities'] ||
+                  sections['Next Steps'] ||
+                  sections['Recommendations'] ||
+                  sections['Critical Recommendations'] ||
+                  '';
+    }
+
+    // For CoM Enhanced, try to combine Current Next Steps and Untapped Opportunities
+    if (nextSteps.length < 100) {
+      const sections = this.extractSections(markdown);
+      const currentNextSteps = sections['Current Next Steps'] || '';
+      const untappedOpps = sections['Untapped Opportunities'] || '';
+      if (currentNextSteps || untappedOpps) {
+        nextSteps = '';
+        if (currentNextSteps) {
+          nextSteps += `*Current Next Steps:*\n${currentNextSteps}\n\n`;
+        }
+        if (untappedOpps) {
+          nextSteps += `*Untapped Opportunities:*\n${untappedOpps}`;
+        }
+        nextSteps = nextSteps.trim();
       }
     }
     

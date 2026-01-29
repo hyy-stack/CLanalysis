@@ -84,7 +84,7 @@ export function createAnalysisCard(
     type: 'section',
     text: {
       type: 'mrkdwn',
-      text: `*${isActiveDeal ? '🎯 Immediate Actions' : '💡 Key Learnings'}*\n${nextSteps}`,
+      text: `*🎯 Critical Next Steps*\n${nextSteps}`,
     },
   });
   

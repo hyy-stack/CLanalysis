@@ -355,7 +355,7 @@ export class SlackClient {
       .trim();
     
     // Post header
-    const nextStepsHeader = `*${isActiveDeal ? '🎯 Recommended Next Steps' : '💡 Key Learnings'}*`;
+    const nextStepsHeader = `*🎯 Critical Next Steps*`;
     await this.client.chat.postMessage({
       channel: targetChannel,
       thread_ts: threadTs,
