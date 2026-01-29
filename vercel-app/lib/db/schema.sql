@@ -72,7 +72,7 @@ CREATE INDEX IF NOT EXISTS idx_manual_emails_batch ON manual_emails(import_batch
 CREATE TABLE IF NOT EXISTS analyses (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   deal_id UUID NOT NULL REFERENCES deals(id) ON DELETE CASCADE,
-  analysis_type VARCHAR(50) NOT NULL CHECK (analysis_type IN ('active_health', 'closed_lost', 'closed_won', 'customer_sentiment')),
+  analysis_type VARCHAR(50) NOT NULL CHECK (analysis_type IN ('active_health', 'closed_lost', 'closed_won', 'customer_sentiment', 'com_enhanced')),
   exec_summary TEXT,
   next_steps TEXT,
   details JSONB, -- Structured analysis output
