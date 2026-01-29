@@ -104,17 +104,17 @@ export class ClaudeClient {
     
     // Find the start of the next major section (Next Steps, Recommendations, etc.)
     // Look for these headers that come AFTER Executive Summary
+    // Note: For CoM Enhanced prompt, exec summary should include everything up to Current Next Steps/Untapped Opportunities
     const nextSectionHeaders = [
+      'Current Next Steps',
+      'Untapped Opportunities',
       'Next Steps',
-      'Recommendations', 
-      'Critical Recommendations',
-      'Key Learnings',
+      'Recommendations',
       'Critical Recommendations',
       'Timeline Assessment',
       'Competitive Landscape',
       'Objections & Concerns',
       'Customer Sentiment Evolution',
-      'Critical Recommendations',
       'Deal Forecast'
     ];
     
