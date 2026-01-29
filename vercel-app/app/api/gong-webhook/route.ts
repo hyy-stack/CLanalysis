@@ -207,6 +207,8 @@ export async function POST(request: NextRequest) {
           // Fire and forget - function may close before fetch completes (this is OK)
           // Socket errors are expected when function ends before fetch completes
           // Use API key to bypass Vercel password protection
+
+          // Trigger PRODUCTION analysis
           fetch(analyzeUrl, {
             method: 'POST',
             headers: {
@@ -217,26 +219,57 @@ export async function POST(request: NextRequest) {
           })
             .then(response => {
               if (!response.ok) {
-                console.error(`[Gong Webhook] Analysis endpoint returned ${response.status}: ${response.statusText}`);
+                console.error(`[Gong Webhook] Production analysis returned ${response.status}: ${response.statusText}`);
                 return response.text().then(text => {
                   console.error(`[Gong Webhook] Response body: ${text.substring(0, 500)}`);
                 });
               }
-              console.log(`[Gong Webhook] ✓ Analysis trigger accepted by server (status ${response.status})`);
+              console.log(`[Gong Webhook] ✓ Production analysis trigger accepted (status ${response.status})`);
             })
             .catch(err => {
-              // Socket errors are expected in fire-and-forget scenarios when function ends early
-              // The request may still be processed server-side even if connection closes
-              const isSocketError = err.cause?.code === 'UND_ERR_SOCKET' || 
+              const isSocketError = err.cause?.code === 'UND_ERR_SOCKET' ||
                                    err.message?.includes('other side closed') ||
                                    err.message?.includes('fetch failed');
-              
+
               if (isSocketError) {
-                console.log(`[Gong Webhook] Analysis trigger initiated (connection closed early - this is OK)`);
+                console.log(`[Gong Webhook] Production analysis trigger initiated (connection closed early - this is OK)`);
               } else if (err.name === 'AbortError') {
-                console.log(`[Gong Webhook] Analysis trigger aborted (this is OK - request was sent)`);
+                console.log(`[Gong Webhook] Production analysis trigger aborted (this is OK - request was sent)`);
               } else {
-                console.error(`[Gong Webhook] Analysis trigger fetch error: ${err.message}`, err);
+                console.error(`[Gong Webhook] Production analysis trigger fetch error: ${err.message}`, err);
+              }
+            });
+
+          // Trigger BETA analysis (CoM Enhanced) - also writes to Google Sheets
+          const betaAnalyzeUrl = 'https://anrok-deal-analyzer.vercel.app/api/analyze-deal-beta';
+          fetch(betaAnalyzeUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-API-Key': apiKey,
+            },
+            body: JSON.stringify({ dealId: deal.id }),
+          })
+            .then(response => {
+              if (!response.ok) {
+                console.error(`[Gong Webhook] Beta analysis returned ${response.status}: ${response.statusText}`);
+                return response.text().then(text => {
+                  console.error(`[Gong Webhook] Response body: ${text.substring(0, 500)}`);
+                });
+              }
+              console.log(`[Gong Webhook] ✓ Beta analysis trigger accepted (status ${response.status})`);
+            })
+            .catch(err => {
+              const isSocketError = err.cause?.code === 'UND_ERR_SOCKET' ||
+                                   err.message?.includes('other side closed') ||
+                                   err.message?.includes('fetch failed');
+
+              if (isSocketError) {
+                console.log(`[Gong Webhook] Beta analysis trigger initiated (connection closed early - this is OK)`);
+              } else if (err.name === 'AbortError') {
+                console.log(`[Gong Webhook] Beta analysis trigger aborted (this is OK - request was sent)`);
+              } else {
+                console.error(`[Gong Webhook] Beta analysis trigger fetch error: ${err.message}`, err);
               }
             });
         }
