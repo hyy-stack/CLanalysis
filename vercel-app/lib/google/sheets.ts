@@ -172,9 +172,16 @@ export function createGoogleSheetsClient(): GoogleSheetsClient | null {
   // Support both base64-encoded key (GOOGLE_PRIVATE_KEY_BASE64) and raw key (GOOGLE_PRIVATE_KEY)
   let privateKey: string | undefined;
   if (process.env.GOOGLE_PRIVATE_KEY_BASE64) {
+    console.log('[Google Sheets] Using base64 key, length:', process.env.GOOGLE_PRIVATE_KEY_BASE64.length);
     privateKey = Buffer.from(process.env.GOOGLE_PRIVATE_KEY_BASE64, 'base64').toString('utf-8');
+    console.log('[Google Sheets] Decoded key starts with:', privateKey.substring(0, 40));
+    console.log('[Google Sheets] Decoded key ends with:', privateKey.substring(privateKey.length - 40));
+  } else if (process.env.GOOGLE_PRIVATE_KEY) {
+    console.log('[Google Sheets] Using raw key, length:', process.env.GOOGLE_PRIVATE_KEY.length);
+    privateKey = process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n');
+    console.log('[Google Sheets] Processed key starts with:', privateKey.substring(0, 40));
   } else {
-    privateKey = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n');
+    console.log('[Google Sheets] No private key found');
   }
 
   if (!email || !privateKey || !spreadsheetId) {
