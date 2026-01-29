@@ -43,7 +43,7 @@ export class GoogleSheetsClient {
   /**
    * Append a row of deal tracking data to the sheet
    */
-  async appendDealTracking(data: DealTrackingData, sheetName: string = 'Manager View'): Promise<void> {
+  async appendDealTracking(data: DealTrackingData, sheetName: string = 'Raw Data'): Promise<void> {
     console.log(`[Google Sheets] Appending deal tracking for: ${data.opportunity}`);
 
     const row = [
@@ -81,7 +81,7 @@ export class GoogleSheetsClient {
   /**
    * Update or insert a deal row (upsert by opportunity name)
    */
-  async upsertDealTracking(data: DealTrackingData, sheetName: string = 'Manager View'): Promise<void> {
+  async upsertDealTracking(data: DealTrackingData, sheetName: string = 'Raw Data'): Promise<void> {
     console.log(`[Google Sheets] Upserting deal tracking for: ${data.opportunity}`);
 
     try {
