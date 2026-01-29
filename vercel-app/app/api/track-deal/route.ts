@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireApiKey } from '@/lib/auth/api-key';
-import { getDealByCrmId } from '@/lib/db/client';
+import { getDealByCrmId, getLatestAnalysis } from '@/lib/db/client';
 import { createSalesforceClient } from '@/lib/salesforce/client';
 import { createGoogleSheetsClient } from '@/lib/google/sheets';
+import type { ComEnhancedStructuredData } from '@/types/database';
 
 /**
  * Deal Tracking API
@@ -68,6 +69,41 @@ export async function POST(request: NextRequest) {
       }, { status: 404 });
     }
 
+    // Get deal from DB to fetch latest analysis
+    const deal = await getDealByCrmId(crmId);
+    let analysisFields = {
+      dealSummary,
+      currentNextSteps,
+      untappedOpportunities,
+      risks,
+    };
+
+    // If fields not provided in request, try to get from latest analysis
+    if (deal && (!dealSummary || !currentNextSteps)) {
+      const latestAnalysis = await getLatestAnalysis(deal.id);
+      if (latestAnalysis) {
+        const structured = latestAnalysis.structured_data as ComEnhancedStructuredData | undefined;
+        if (structured) {
+          console.log('[Track Deal] Using structured data from analysis:', latestAnalysis.id);
+          analysisFields = {
+            dealSummary: dealSummary || structured.dealSummary || '',
+            currentNextSteps: currentNextSteps || structured.currentNextSteps || '',
+            untappedOpportunities: untappedOpportunities || structured.untappedOpportunities || '',
+            risks: risks || structured.criticalIssues?.join(', ') || '',
+          };
+        } else {
+          // Fall back to exec_summary and next_steps from non-structured analysis
+          console.log('[Track Deal] Using non-structured data from analysis:', latestAnalysis.id);
+          analysisFields = {
+            dealSummary: dealSummary || latestAnalysis.exec_summary || '',
+            currentNextSteps: currentNextSteps || latestAnalysis.next_steps || '',
+            untappedOpportunities: untappedOpportunities || '',
+            risks: risks || '',
+          };
+        }
+      }
+    }
+
     // Write to Google Sheets
     console.log('[Track Deal] Writing to Google Sheets...');
     await sheetsClient.upsertDealTracking({
@@ -78,10 +114,7 @@ export async function POST(request: NextRequest) {
       closeDate: sfFields.closeDate,
       oppStage: sfFields.stageName || '',
       probability: sfFields.probability,
-      dealSummary,
-      currentNextSteps,
-      untappedOpportunities,
-      risks,
+      ...analysisFields,
     });
 
     console.log('[Track Deal] Successfully tracked deal');
