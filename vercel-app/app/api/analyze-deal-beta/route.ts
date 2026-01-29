@@ -102,10 +102,13 @@ export async function POST(request: NextRequest) {
       stageName: string | null;
       probability: number | null;
     } | null = null;
+    let sfOpportunityName: string | null = null;
 
     if (salesforceClient && deal.crm_id) {
       try {
         sfFields = await salesforceClient.getOpportunityFields(deal.crm_id);
+        const opportunity = await salesforceClient.getOpportunity(deal.crm_id);
+        sfOpportunityName = opportunity?.Name || null;
         const updates: { roleSegment?: string; arr?: number; ownerName?: string } = {};
 
         if (sfFields.roleSegment && sfFields.roleSegment !== deal.role_segment) {
@@ -229,7 +232,7 @@ export async function POST(request: NextRequest) {
       if (sheetsClient) {
         try {
           await sheetsClient.upsertDealTracking({
-            opportunity: deal.name,
+            opportunity: sfOpportunityName || deal.name,
             account: sfFields?.accountName || deal.account_name || '',
             opportunityOwner: sfFields?.ownerName || deal.owner_name || '',
             arr: sfFields?.arr || deal.arr || null,
