@@ -16,17 +16,33 @@ async function formatInteraction(
 ): Promise<string> {
   const date = new Date(interaction.timestamp).toLocaleDateString();
   const type = interaction.type === 'call' ? '📞 CALL' : '📧 EMAIL';
-  
+
   // Retrieve content from Blob
   const content = await retrieveContent(interaction.blob_url);
-  
+
   let formatted = `\n## ${type} #${index + 1} - ${date}\n\n`;
   formatted += `**Title**: ${interaction.title || 'Untitled'}\n`;
-  
+
   if (interaction.type === 'call' && interaction.duration) {
     formatted += `**Duration**: ${Math.floor(interaction.duration / 60)} minutes\n`;
   }
-  
+
+  // Include participants with titles for calls
+  if (interaction.type === 'call' && interaction.participants) {
+    const participants = Array.isArray(interaction.participants)
+      ? interaction.participants
+      : [];
+
+    if (participants.length > 0) {
+      formatted += `\n**Participants**:\n`;
+      participants.forEach((p: any) => {
+        const affiliation = p.affiliation === 'External' ? '(Customer)' : '(Anrok)';
+        const title = p.title ? ` - ${p.title}` : '';
+        formatted += `- ${p.name}${title} ${affiliation}\n`;
+      });
+    }
+  }
+
   formatted += `\n**Content**:\n\n`;
   
   if (interaction.type === 'call') {
