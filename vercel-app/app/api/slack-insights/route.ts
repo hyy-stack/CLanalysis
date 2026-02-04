@@ -52,6 +52,7 @@ export async function POST(request: NextRequest) {
       const body = await request.json();
       channelId = body.channel_id || body.channel;
       days = body.days || DEFAULT_DAYS;
+      responseUrl = body.response_url; // Pass through for background processing
 
       // Verify API key for webhook requests
       const apiKey = request.headers.get('x-api-key');
@@ -62,10 +63,26 @@ export async function POST(request: NextRequest) {
       console.log(`[Insights] Webhook request, days=${days}`);
     }
 
-    // For slash commands, respond immediately
+    // For slash commands, respond immediately and trigger background processing
     if (isSlashCommand && channelId) {
-      processAndPost(channelId, days, responseUrl).catch(err => {
-        console.error('[Insights] Async processing failed:', err);
+      // Trigger processing via internal API call (runs in separate invocation)
+      const baseUrl = process.env.VERCEL_URL
+        ? `https://${process.env.VERCEL_URL}`
+        : process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+
+      fetch(`${baseUrl}/api/slack-insights`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': process.env.INTERNAL_API_KEY || '',
+        },
+        body: JSON.stringify({
+          channel_id: channelId,
+          days,
+          response_url: responseUrl,
+        }),
+      }).catch(err => {
+        console.error('[Insights] Failed to trigger background processing:', err);
       });
 
       return NextResponse.json({

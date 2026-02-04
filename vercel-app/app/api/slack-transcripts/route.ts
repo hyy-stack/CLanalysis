@@ -53,6 +53,7 @@ export async function POST(request: NextRequest) {
       const body = await request.json();
       channelId = body.channel_id || body.channel;
       days = body.days || DEFAULT_DAYS;
+      responseUrl = body.response_url; // Pass through for background processing
 
       // For workflow webhooks, verify API key
       const apiKey = request.headers.get('x-api-key');
@@ -67,11 +68,26 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing channel_id' }, { status: 400 });
     }
 
-    // For slash commands, respond immediately to avoid timeout
+    // For slash commands, respond immediately and trigger background processing
     if (isSlashCommand) {
-      // Process async and respond to response_url later
-      processAndUpload(channelId, days, responseUrl).catch(err => {
-        console.error('[Slack Transcripts] Async processing failed:', err);
+      // Trigger processing via internal API call (runs in separate invocation)
+      const baseUrl = process.env.VERCEL_URL
+        ? `https://${process.env.VERCEL_URL}`
+        : process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+
+      fetch(`${baseUrl}/api/slack-transcripts`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': process.env.INTERNAL_API_KEY || '',
+        },
+        body: JSON.stringify({
+          channel_id: channelId,
+          days,
+          response_url: responseUrl,
+        }),
+      }).catch(err => {
+        console.error('[Slack Transcripts] Failed to trigger background processing:', err);
       });
 
       return NextResponse.json({
@@ -81,7 +97,7 @@ export async function POST(request: NextRequest) {
     }
 
     // For webhook requests, process synchronously
-    const result = await processAndUpload(channelId, days);
+    const result = await processAndUpload(channelId, days, responseUrl);
     return NextResponse.json(result);
 
   } catch (error) {
