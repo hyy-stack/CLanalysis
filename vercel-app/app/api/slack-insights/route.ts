@@ -127,9 +127,9 @@ async function processAndPost(
 
   console.log(`[Insights] Fetching transcripts since ${cutoffIso}`);
 
-  // Fetch active deal transcripts
+  // Fetch active deal transcripts (include participants for speaker identification)
   const activeQuery = await sql`
-    SELECT i.id, i.external_id, i.title, i.timestamp, i.blob_url,
+    SELECT i.id, i.external_id, i.title, i.timestamp, i.blob_url, i.participants,
            d.name as deal_name, d.crm_id, d.stage, d.account_name
     FROM interactions i
     JOIN deals d ON i.deal_id = d.id
@@ -145,7 +145,7 @@ async function processAndPost(
 
   // Fetch closed lost transcripts
   const closedLostQuery = await sql`
-    SELECT i.id, i.external_id, i.title, i.timestamp, i.blob_url,
+    SELECT i.id, i.external_id, i.title, i.timestamp, i.blob_url, i.participants,
            d.name as deal_name, d.crm_id, d.stage, d.account_name
     FROM interactions i
     JOIN deals d ON i.deal_id = d.id
@@ -213,8 +213,35 @@ async function processAndPost(
 }
 
 /**
+ * Build speaker map from participants data
+ * Maps speakerId to { name, isAnrok }
+ */
+function buildSpeakerMap(participants: any[]): Map<string, { name: string; isAnrok: boolean }> {
+  const speakerMap = new Map<string, { name: string; isAnrok: boolean }>();
+
+  if (!participants || !Array.isArray(participants)) {
+    return speakerMap;
+  }
+
+  for (const p of participants) {
+    const speakerId = p.speakerId || p.id;
+    if (!speakerId) continue;
+
+    const name = p.name || p.emailAddress?.split('@')[0] || 'Unknown';
+    const email = p.emailAddress || '';
+    const isAnrok = email.toLowerCase().includes('@anrok.com') ||
+                    email.toLowerCase().includes('@anrok.io') ||
+                    (p.affiliation === 'internal');
+
+    speakerMap.set(String(speakerId), { name, isAnrok });
+  }
+
+  return speakerMap;
+}
+
+/**
  * Build transcript content for Claude analysis
- * Includes all turns - Claude will identify customer vs rep from context
+ * Uses participants data to identify customer vs Anrok speakers
  */
 async function buildTranscriptContent(transcripts: any[]): Promise<string> {
   const contents: string[] = [];
@@ -224,20 +251,26 @@ async function buildTranscriptContent(transcripts: any[]): Promise<string> {
       const raw = await retrieveContent(t.blob_url);
       const transcript = JSON.parse(raw);
 
+      // Build speaker map from participants
+      const speakerMap = buildSpeakerMap(t.participants);
+
       let text = `\n--- CALL: ${t.deal_name || t.account_name || 'Unknown'} (${new Date(t.timestamp).toLocaleDateString()}) ---\n`;
 
       if (transcript.turns && Array.isArray(transcript.turns)) {
-        // Build speaker map to use consistent labels (Speaker A, Speaker B, etc.)
-        const speakerMap = new Map<string, string>();
-        let speakerCount = 0;
-
         for (const turn of transcript.turns) {
-          const speakerId = turn.speakerId || turn.speaker || 'unknown';
-          if (!speakerMap.has(speakerId)) {
-            speakerCount++;
-            speakerMap.set(speakerId, `Speaker ${speakerCount}`);
+          const speakerId = String(turn.speakerId || turn.speaker || 'unknown');
+          const speakerInfo = speakerMap.get(speakerId);
+
+          let label: string;
+          if (speakerInfo) {
+            label = speakerInfo.isAnrok
+              ? `[ANROK] ${speakerInfo.name}`
+              : `[CUSTOMER] ${speakerInfo.name}`;
+          } else {
+            // Fallback if no participant data
+            label = `Speaker ${speakerId.slice(-4)}`;
           }
-          const label = speakerMap.get(speakerId)!;
+
           text += `${label}: ${turn.text}\n`;
         }
       }
@@ -311,10 +344,10 @@ Analyze these transcripts and provide insights in the following JSON format:
 
 ## GUIDELINES
 
-1. **Identify customers from context**: Speakers are labeled as "Speaker 1", "Speaker 2", etc. The Anrok sales rep typically leads demos, explains features, and asks discovery questions. The CUSTOMER typically asks questions about pricing, implementation, asks "can it do X?", expresses concerns, or gives feedback.
-2. **Only include ACTUAL quotes** from customers (NOT from the Anrok sales rep)
-3. **Be specific** - include the exact words they used
-4. **Look for emotional language** - excitement, frustration, confusion, praise
+1. **Speakers are labeled**: [CUSTOMER] for prospects/customers, [ANROK] for Anrok employees. Only include quotes from [CUSTOMER] speakers.
+2. **Be specific** - include the exact words they used
+3. **Look for emotional language** - excitement, frustration, confusion, praise
+4. **Ignore small talk** - focus on feedback about the product, process, or decision-making
 5. **For closed lost deals**, focus on:
    - Why they chose a competitor
    - What features were missing
