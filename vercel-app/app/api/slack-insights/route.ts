@@ -18,7 +18,8 @@ import Anthropic from '@anthropic-ai/sdk';
  */
 
 const DEFAULT_DAYS = 14;
-const MAX_TRANSCRIPTS_PER_ANALYSIS = 50; // Limit to avoid token limits
+const MAX_TRANSCRIPTS_PER_ANALYSIS = 25; // Reduced to stay under token limits
+const MAX_CHARS_PER_TRANSCRIPT = 15000; // ~4k tokens per transcript
 
 export async function POST(request: NextRequest) {
   console.log('[Insights] Received request');
@@ -177,6 +178,9 @@ async function processAndPost(
   const activeContent = await buildTranscriptContent(activeTranscripts);
   const closedLostContent = await buildTranscriptContent(closedLostTranscripts);
 
+  const totalChars = activeContent.length + closedLostContent.length;
+  console.log(`[Insights] Content size: ${totalChars} chars (~${Math.round(totalChars / 4)} tokens)`);
+
   // Analyze with Claude
   const insights = await analyzeWithClaude(activeContent, closedLostContent, days);
 
@@ -210,6 +214,7 @@ async function processAndPost(
 
 /**
  * Build transcript content for Claude analysis
+ * Only includes customer turns to reduce token count
  */
 async function buildTranscriptContent(transcripts: any[]): Promise<string> {
   const contents: string[] = [];
@@ -222,13 +227,19 @@ async function buildTranscriptContent(transcripts: any[]): Promise<string> {
       let text = `\n--- CALL: ${t.deal_name || t.account_name || 'Unknown'} (${new Date(t.timestamp).toLocaleDateString()}) ---\n`;
 
       if (transcript.turns && Array.isArray(transcript.turns)) {
-        // Extract customer turns (look for external/customer speakers)
+        // Only extract CUSTOMER turns to reduce token usage
         for (const turn of transcript.turns) {
-          // Include all turns but mark speaker role
-          const speaker = turn.speaker || 'Unknown';
           const role = turn.speakerRole || 'other';
-          text += `[${role === 'customer' ? 'CUSTOMER' : 'ANROK'}] ${speaker}: ${turn.text}\n`;
+          if (role === 'customer' || role === 'external') {
+            const speaker = turn.speaker || 'Customer';
+            text += `${speaker}: ${turn.text}\n`;
+          }
         }
+      }
+
+      // Truncate if too long
+      if (text.length > MAX_CHARS_PER_TRANSCRIPT) {
+        text = text.substring(0, MAX_CHARS_PER_TRANSCRIPT) + '\n[...truncated]';
       }
 
       contents.push(text);
