@@ -21,8 +21,11 @@ const DEFAULT_DAYS = 14;
 const MAX_TRANSCRIPTS_PER_ANALYSIS = 50; // Limit to avoid token limits
 
 export async function POST(request: NextRequest) {
+  console.log('[Insights] Received request');
+
   try {
     const contentType = request.headers.get('content-type') || '';
+    console.log(`[Insights] Content-Type: ${contentType}`);
 
     let channelId: string | undefined;
     let days: number = DEFAULT_DAYS;
@@ -101,10 +104,11 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('[Insights] Error:', error);
-    return NextResponse.json(
-      { error: 'Failed to process request' },
-      { status: 500 }
-    );
+    // Always return 200 to Slack to prevent retry loops
+    return NextResponse.json({
+      response_type: 'ephemeral',
+      text: `❌ Error: ${(error as Error).message}`,
+    });
   }
 }
 
