@@ -54,9 +54,10 @@ export async function POST(request: NextRequest) {
       days = body.days || DEFAULT_DAYS;
       responseUrl = body.response_url; // Pass through for background processing
 
-      // Verify API key for webhook requests
-      const apiKey = request.headers.get('x-api-key');
+      // Verify API key for webhook requests (check both header and body for internal calls)
+      const apiKey = request.headers.get('x-api-key') || body.api_key;
       if (apiKey !== process.env.INTERNAL_API_KEY) {
+        console.log('[Insights] Auth failed - key mismatch');
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
       }
 
@@ -70,16 +71,20 @@ export async function POST(request: NextRequest) {
         ? `https://${process.env.VERCEL_URL}`
         : process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
+      const internalKey = process.env.INTERNAL_API_KEY || '';
+      console.log(`[Insights] Triggering background call to ${baseUrl}, key length: ${internalKey.length}`);
+
       fetch(`${baseUrl}/api/slack-insights`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-api-key': process.env.INTERNAL_API_KEY || '',
+          'x-api-key': internalKey,
         },
         body: JSON.stringify({
           channel_id: channelId,
           days,
           response_url: responseUrl,
+          api_key: internalKey, // Backup in body
         }),
       }).catch(err => {
         console.error('[Insights] Failed to trigger background processing:', err);
