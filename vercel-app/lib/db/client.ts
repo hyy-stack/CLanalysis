@@ -160,6 +160,9 @@ export async function createInteraction(
     duration?: number;
     participants?: any[];
     source: 'gong_webhook' | 'manual_import' | 'gong_api';
+    exclusionReason?: string;
+    dealStages?: string[];
+    [key: string]: any; // Allow additional metadata fields
   }
 ): Promise<Interaction> {
   const result = await sql`

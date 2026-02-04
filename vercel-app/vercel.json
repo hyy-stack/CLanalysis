@@ -10,6 +10,9 @@
     "app/api/analyze-deal-beta/*.ts": {
       "maxDuration": 300
     },
+    "app/api/download-transcripts/*.ts": {
+      "maxDuration": 300
+    },
     "app/api/**/*.ts": {
       "maxDuration": 60
     }

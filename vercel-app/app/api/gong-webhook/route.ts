@@ -76,48 +76,38 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ status: 'already_processed', callId });
     }
     
-    // Extract CRM opportunity IDs and check deal stages
-    const crmIds = extractCrmIds(payload);
-    
-    // Check if this is a post-sales/won deal we should skip
-    const dealStages = extractDealStages(payload);
-    const isPostSales = dealStages.some(stage => 
-      isWonOrPostSalesStage(stage)
-    );
-    
-    if (isPostSales) {
-      console.log(`[Gong Webhook] Skipping post-sales/won deal (stages: ${dealStages.join(', ')})`);
-      return NextResponse.json({ 
-        status: 'skipped', 
-        reason: 'post_sales_deal',
-        stages: dealStages 
-      });
-    }
-    
-    if (crmIds.length === 0) {
-      console.log(`[Gong Webhook] No CRM IDs found for call ${callId}`);
-      // Still process the call, but with null deal_id
-    }
-    
     // Use call data from webhook payload (already has everything we need!)
     const call = body.callData?.metaData;
     const parties = body.callData?.parties || [];
-    
-    // Check if this is only an onboarding manager call (after parties is defined)
-    if (isOnlyOnboardingManager(parties)) {
-      console.log(`[Gong Webhook] Skipping onboarding manager call`);
-      return NextResponse.json({
-        status: 'skipped',
-        reason: 'onboarding_call',
-      });
-    }
-    
+
     if (!call || !call.id) {
       console.error(`[Gong Webhook] Invalid call data in webhook`);
       return NextResponse.json({ error: 'Invalid call data' }, { status: 400 });
     }
-    
+
     console.log(`[Gong Webhook] Call: ${call.title}, Parties: ${parties.length}`);
+
+    // Extract CRM opportunity IDs and check deal stages
+    const crmIds = extractCrmIds(payload);
+    const dealStages = extractDealStages(payload);
+
+    // Determine exclusion reasons (but DON'T skip - always save transcript first)
+    const isPostSales = dealStages.some(stage => isWonOrPostSalesStage(stage));
+    const isOnboardingCall = isOnlyOnboardingManager(parties);
+
+    let exclusionReason: string | null = null;
+    if (isPostSales) {
+      exclusionReason = 'post_sales_deal';
+      console.log(`[Gong Webhook] Post-sales deal detected (stages: ${dealStages.join(', ')}) - will save transcript but skip analysis`);
+    } else if (isOnboardingCall) {
+      exclusionReason = 'onboarding_call';
+      console.log(`[Gong Webhook] Onboarding manager call detected - will save transcript but skip analysis`);
+    }
+
+    if (crmIds.length === 0) {
+      console.log(`[Gong Webhook] No CRM IDs found for call ${callId}`);
+      // Still process the call, but with null deal_id
+    }
     
     // Initialize Gong client for transcript fetch
     const gongClient = new GongClient(
@@ -167,7 +157,7 @@ export async function POST(request: NextRequest) {
       
       dealIds.push(deal.id);
       
-      // Create interaction record
+      // Create interaction record (always - even for excluded calls)
       await createInteraction(
         deal.id,
         'call',
@@ -179,14 +169,19 @@ export async function POST(request: NextRequest) {
           duration: call.duration,
           participants: parties,
           source: 'gong_webhook',
+          exclusionReason: exclusionReason || undefined,
+          dealStages: dealStages,
         }
       );
-      
-      console.log(`[Gong Webhook] Interaction created for deal ${deal.id}`);
-      
-      // Email enrichment disabled for now (data-privacy endpoint not working as expected)
-      // Can be re-enabled once we understand Gong's email API better
-      
+
+      console.log(`[Gong Webhook] Interaction created for deal ${deal.id}${exclusionReason ? ` (excluded: ${exclusionReason})` : ''}`);
+
+      // Skip analysis for excluded calls (but transcript is already saved above)
+      if (exclusionReason) {
+        console.log(`[Gong Webhook] Skipping analysis for excluded call (reason: ${exclusionReason})`);
+        continue;
+      }
+
       // Auto-trigger analysis after EVERY qualifying call
       try {
         const interactions = await (await import('@/lib/db/client')).getInteractionsForDeal(deal.id);
@@ -280,7 +275,7 @@ export async function POST(request: NextRequest) {
     }
     
     if (dealIds.length === 0 && crmIds.length === 0) {
-      // No CRM association, create orphaned interaction
+      // No CRM association, create orphaned interaction (still save transcript)
       await createInteraction(
         null,
         'call',
@@ -292,17 +287,21 @@ export async function POST(request: NextRequest) {
           duration: call.duration,
           participants: parties,
           source: 'gong_webhook',
+          exclusionReason: exclusionReason || undefined,
+          dealStages: dealStages,
         }
       );
-      
-      console.log(`[Gong Webhook] Orphaned call stored (no CRM ID)`);
+
+      console.log(`[Gong Webhook] Orphaned call stored (no CRM ID)${exclusionReason ? ` - excluded: ${exclusionReason}` : ''}`);
     }
-    
+
     return NextResponse.json({
       status: 'success',
       callId,
       dealsProcessed: dealIds.length,
       dealIds,
+      transcriptSaved: true,
+      exclusionReason: exclusionReason || undefined,
     });
     
   } catch (error) {
