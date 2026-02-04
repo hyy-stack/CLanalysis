@@ -72,9 +72,8 @@ export async function POST(request: NextRequest) {
     // For slash commands, respond immediately and trigger background processing
     if (isSlashCommand) {
       // Trigger processing via internal API call (runs in separate invocation)
-      const baseUrl = process.env.VERCEL_URL
-        ? `https://${process.env.VERCEL_URL}`
-        : process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+      // Use the same origin as the incoming request
+      const baseUrl = new URL(request.url).origin;
 
       const internalKey = process.env.INTERNAL_API_KEY || '';
       console.log(`[Slack Transcripts] Triggering background call to ${baseUrl}, key length: ${internalKey.length}`);
