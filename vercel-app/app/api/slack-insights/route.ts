@@ -18,8 +18,8 @@ import Anthropic from '@anthropic-ai/sdk';
  */
 
 const DEFAULT_DAYS = 14;
-const MAX_TRANSCRIPTS_PER_ANALYSIS = 25; // Reduced to stay under token limits
-const MAX_CHARS_PER_TRANSCRIPT = 15000; // ~4k tokens per transcript
+const MAX_TRANSCRIPTS_PER_ANALYSIS = 15; // Reduced to stay under token limits
+const MAX_CHARS_PER_TRANSCRIPT = 10000; // ~2.5k tokens per transcript
 
 export async function POST(request: NextRequest) {
   console.log('[Insights] Received request');
@@ -214,7 +214,7 @@ async function processAndPost(
 
 /**
  * Build transcript content for Claude analysis
- * Only includes customer turns to reduce token count
+ * Includes all turns - Claude will identify customer vs rep from context
  */
 async function buildTranscriptContent(transcripts: any[]): Promise<string> {
   const contents: string[] = [];
@@ -227,13 +227,18 @@ async function buildTranscriptContent(transcripts: any[]): Promise<string> {
       let text = `\n--- CALL: ${t.deal_name || t.account_name || 'Unknown'} (${new Date(t.timestamp).toLocaleDateString()}) ---\n`;
 
       if (transcript.turns && Array.isArray(transcript.turns)) {
-        // Only extract CUSTOMER turns to reduce token usage
+        // Build speaker map to use consistent labels (Speaker A, Speaker B, etc.)
+        const speakerMap = new Map<string, string>();
+        let speakerCount = 0;
+
         for (const turn of transcript.turns) {
-          const role = turn.speakerRole || 'other';
-          if (role === 'customer' || role === 'external') {
-            const speaker = turn.speaker || 'Customer';
-            text += `${speaker}: ${turn.text}\n`;
+          const speakerId = turn.speakerId || turn.speaker || 'unknown';
+          if (!speakerMap.has(speakerId)) {
+            speakerCount++;
+            speakerMap.set(speakerId, `Speaker ${speakerCount}`);
           }
+          const label = speakerMap.get(speakerId)!;
+          text += `${label}: ${turn.text}\n`;
         }
       }
 
@@ -306,16 +311,17 @@ Analyze these transcripts and provide insights in the following JSON format:
 
 ## GUIDELINES
 
-1. **Only include ACTUAL quotes** from customers (marked as [CUSTOMER] in transcripts)
-2. **Be specific** - include the exact words they used
-3. **Look for emotional language** - excitement, frustration, confusion, praise
-4. **For closed lost deals**, focus on:
+1. **Identify customers from context**: Speakers are labeled as "Speaker 1", "Speaker 2", etc. The Anrok sales rep typically leads demos, explains features, and asks discovery questions. The CUSTOMER typically asks questions about pricing, implementation, asks "can it do X?", expresses concerns, or gives feedback.
+2. **Only include ACTUAL quotes** from customers (NOT from the Anrok sales rep)
+3. **Be specific** - include the exact words they used
+4. **Look for emotional language** - excitement, frustration, confusion, praise
+5. **For closed lost deals**, focus on:
    - Why they chose a competitor
    - What features were missing
    - Pricing concerns
    - Timeline/timing issues
-5. **Aim for 5-10 quotes** in each category if available
-6. **If transcripts are limited**, include what's available and note it in the summary
+6. **Aim for 5-10 quotes** in each category if available
+7. **If transcripts are limited**, include what's available and note it in the summary
 
 Return ONLY valid JSON, no other text.`;
 
