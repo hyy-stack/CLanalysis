@@ -26,6 +26,7 @@ const INSIGHT_CONFIG: Record<InsightType, {
   emoji: string;
   queryCondition: string;
   extractionContext: string;
+  extractionInstructions: string;
   categorizationContext: string;
 }> = {
   prospect: {
@@ -37,6 +38,16 @@ const INSIGHT_CONFIG: Record<InsightType, {
       AND d.stage NOT ILIKE '%lost%'
     `,
     extractionContext: 'These are sales calls with prospects who are evaluating Anrok.',
+    extractionInstructions: `
+1. Only extract quotes from speakers labeled [CUSTOMER] - never from [ANROK] speakers
+2. Focus on quotes about:
+   - Product feedback (positive or negative)
+   - Pain points and frustrations
+   - What's working well
+   - Concerns about pricing, features, competition
+   - Reasons for decisions
+3. Skip small talk, greetings, and generic responses
+4. Include the exact words they used`,
     categorizationContext: `
 For POSITIVE feedback, look for themes like:
 - Ease of Use / Simplicity
@@ -59,6 +70,17 @@ For CONCERNS, look for themes like:
       (d.stage ILIKE '%closed%won%' OR d.stage ILIKE '%won%')
     `,
     extractionContext: 'These are calls with existing customers who are using Anrok.',
+    extractionInstructions: `
+1. Only extract quotes from speakers labeled [CUSTOMER] - never from [ANROK] speakers
+2. Focus on quotes about:
+   - Product satisfaction or dissatisfaction
+   - How they're using the product
+   - Time/effort saved or wasted
+   - Support experiences
+   - Feature requests or complaints
+   - Value they're getting (or not)
+3. Skip small talk, greetings, and generic responses
+4. Include the exact words they used`,
     categorizationContext: `
 For POSITIVE feedback, look for themes like:
 - Product Satisfaction
@@ -80,16 +102,33 @@ For CONCERNS, look for themes like:
     queryCondition: `
       (d.stage ILIKE '%closed%lost%' OR d.stage ILIKE '%lost%')
     `,
-    extractionContext: 'These are calls with prospects who ultimately did not choose Anrok.',
+    extractionContext: `These are calls with prospects who ultimately did NOT choose Anrok.
+Your job is to find quotes that explain WHY they didn't buy.`,
+    extractionInstructions: `
+1. Only extract quotes from speakers labeled [CUSTOMER] - never from [ANROK] speakers
+2. FOCUS SPECIFICALLY on quotes that reveal why they didn't choose Anrok:
+   - Mentions of choosing a competitor (which one? why?)
+   - Pricing objections or budget constraints
+   - Missing features that were deal-breakers
+   - Timing issues ("not the right time", "maybe next year")
+   - Internal blockers ("leadership decided", "other priorities")
+   - Concerns that weren't resolved
+   - Comparisons where Anrok fell short
+3. IGNORE generic product feedback - we only want loss reasons
+4. If they mention a competitor by name, ALWAYS include that quote
+5. Include the exact words they used`,
     categorizationContext: `
-Focus on understanding WHY deals were lost. Look for themes like:
-- Chose Competitor (which one and why)
-- Pricing Too High
-- Missing Critical Features
-- Bad Timing / Budget Constraints
-- Internal Priorities Changed
-- Implementation Concerns
-- Went with Status Quo`,
+Group quotes by the PRIMARY REASON the deal was lost. Be specific:
+
+- **Chose [Competitor Name]** - They explicitly chose another vendor (name it if mentioned)
+- **Pricing/Budget** - Cost was too high or budget wasn't available
+- **Missing Features** - Specific functionality gaps that were deal-breakers
+- **Timing** - Not the right time, delayed decision, revisiting later
+- **Internal Priorities** - Other projects took precedence, leadership said no
+- **Went with Status Quo** - Decided to stick with current solution or do nothing
+- **Implementation Concerns** - Worried about effort, complexity, or disruption
+
+Do NOT create generic categories like "General Concerns" - every category should be a specific loss reason.`,
   },
 };
 
@@ -143,7 +182,7 @@ export async function analyzeInsights(
   console.log(`[${config.title}] Split into ${batches.length} batches`);
 
   const extractionPromises = batches.map((batch, index) =>
-    extractQuotesFromBatch(batch, index, batches.length, config.extractionContext, config.title)
+    extractQuotesFromBatch(batch, index, batches.length, config, config.title)
   );
 
   const batchResults = await Promise.all(extractionPromises);
@@ -217,7 +256,7 @@ async function extractQuotesFromBatch(
   batch: TranscriptRow[],
   batchIndex: number,
   totalBatches: number,
-  extractionContext: string,
+  config: typeof INSIGHT_CONFIG[InsightType],
   logPrefix: string
 ): Promise<ExtractedQuote[]> {
   console.log(`[${logPrefix}] Processing batch ${batchIndex + 1}/${totalBatches} (${batch.length} transcripts)`);
@@ -230,31 +269,22 @@ async function extractQuotesFromBatch(
 
   const anthropic = new Anthropic();
 
-  const prompt = `Extract all meaningful customer quotes from these sales call transcripts.
+  const prompt = `Extract customer quotes from these sales call transcripts.
 
 ## CONTEXT
-${extractionContext}
+${config.extractionContext}
 
 ## TRANSCRIPTS
 ${transcriptContents}
 
 ## INSTRUCTIONS
-
-1. Only extract quotes from speakers labeled [CUSTOMER] - never from [ANROK] speakers
-2. Focus on quotes about:
-   - Product feedback (positive or negative)
-   - Pain points and frustrations
-   - What's working well
-   - Concerns about pricing, features, competition
-   - Reasons for decisions
-3. Skip small talk, greetings, and generic responses
-4. Include the exact words they used
+${config.extractionInstructions}
 
 Return a JSON array of quotes:
 [
   {
     "quote": "Exact customer quote",
-    "context": "Brief context (1 sentence)",
+    "context": "Brief context explaining what this quote reveals",
     "dealName": "Company name from the transcript header",
     "sentiment": "positive" | "negative" | "neutral"
   }
