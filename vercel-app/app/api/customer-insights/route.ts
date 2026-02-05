@@ -9,6 +9,8 @@ import { analyzeInsights } from '@/lib/insights/analyze';
  * Slack command: /customer-insights [days]
  */
 
+export const maxDuration = 300; // Pro tier: 5 minutes
+
 const DEFAULT_DAYS = 14;
 
 export async function POST(request: NextRequest) {
