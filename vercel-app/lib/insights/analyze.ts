@@ -198,18 +198,6 @@ export async function analyzeInsights(
     await postInsightsToSlack(channelId, categorizedInsights, days, transcripts.length, allQuotes.length, config);
   }
 
-  // Respond to slash command
-  if (responseUrl) {
-    await fetch(responseUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        response_type: 'in_channel',
-        text: `✅ ${config.title} analysis complete. Check the channel for detailed results.`,
-      }),
-    });
-  }
-
   return {
     success: true,
     insights: categorizedInsights,
