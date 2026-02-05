@@ -36,6 +36,14 @@ const INSIGHT_CONFIG: Record<InsightType, {
       d.stage NOT ILIKE '%closed%'
       AND d.stage NOT ILIKE '%won%'
       AND d.stage NOT ILIKE '%lost%'
+      -- Exclude post-sales call types that might be mislinked
+      AND i.title NOT ILIKE '%kickoff%'
+      AND i.title NOT ILIKE '%kick-off%'
+      AND i.title NOT ILIKE '%onboarding%'
+      AND i.title NOT ILIKE '%check in%'
+      AND i.title NOT ILIKE '%check-in%'
+      AND i.title NOT ILIKE '%implementation%'
+      AND i.title NOT ILIKE '%qbr%'
     `,
     extractionContext: 'These are sales calls with prospects who are evaluating Anrok.',
     extractionInstructions: `
@@ -67,9 +75,27 @@ For CONCERNS, look for themes like:
     title: 'Customer Insights',
     emoji: '💚',
     queryCondition: `
-      (d.stage ILIKE '%closed%won%' OR d.stage ILIKE '%won%')
+      (
+        -- Closed won deals with post-sales call titles
+        (d.stage ILIKE '%closed%won%' OR d.stage ILIKE '%won%')
+        AND (
+          i.title ILIKE '%kickoff%'
+          OR i.title ILIKE '%kick-off%'
+          OR i.title ILIKE '%kick off%'
+          OR i.title ILIKE '%onboarding%'
+          OR i.title ILIKE '%check in%'
+          OR i.title ILIKE '%check-in%'
+          OR i.title ILIKE '%checkin%'
+          OR i.title ILIKE '%implementation%'
+          OR i.title ILIKE '%pilot%'
+          OR i.title ILIKE '%qbr%'
+          OR i.title ILIKE '%quarterly%'
+          OR i.title ILIKE '%support%'
+          OR i.title ILIKE '%training%'
+        )
+      )
     `,
-    extractionContext: 'These are calls with existing customers who are using Anrok.',
+    extractionContext: 'These are post-sales calls with existing customers (onboarding, check-ins, QBRs, etc.).',
     extractionInstructions: `
 1. Only extract quotes from speakers labeled [CUSTOMER] - never from [ANROK] speakers
 2. Focus on quotes about:
