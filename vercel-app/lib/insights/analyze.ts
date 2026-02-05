@@ -395,8 +395,9 @@ Return JSON in this exact format:
 Return ONLY valid JSON, no other text.`;
 
   try {
+    // Use Haiku for faster categorization (quotes already extracted, just organizing)
     const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-3-5-haiku-20241022',
       max_tokens: 8000,
       messages: [{ role: 'user', content: prompt }],
     });
