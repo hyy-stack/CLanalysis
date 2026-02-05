@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { after } from 'next/server';
 import { sql } from '@vercel/postgres';
 import { WebClient } from '@slack/web-api';
 import { retrieveContent } from '@/lib/blob/storage';
@@ -13,6 +14,8 @@ import JSZip from 'jszip';
  *
  * Default: 14 days of transcripts
  */
+
+export const maxDuration = 300; // Pro tier: 5 minutes
 
 const DEFAULT_DAYS = 14;
 
@@ -69,29 +72,28 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing channel_id' }, { status: 400 });
     }
 
-    // For slash commands, respond immediately and trigger background processing
+    // For slash commands, respond immediately and run processing in background
     if (isSlashCommand) {
-      // Trigger processing via internal API call (runs in separate invocation)
-      // Use the same origin as the incoming request
-      const baseUrl = new URL(request.url).origin;
+      console.log(`[Slack Transcripts] Scheduling background processing`);
 
-      const internalKey = process.env.INTERNAL_API_KEY || '';
-      console.log(`[Slack Transcripts] Triggering background call to ${baseUrl}, key length: ${internalKey.length}`);
-
-      fetch(`${baseUrl}/api/slack-transcripts`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': internalKey,
-        },
-        body: JSON.stringify({
-          channel_id: channelId,
-          days,
-          response_url: responseUrl,
-          api_key: internalKey, // Backup in body
-        }),
-      }).catch(err => {
-        console.error('[Slack Transcripts] Failed to trigger background processing:', err);
+      after(async () => {
+        try {
+          console.log(`[Slack Transcripts] Background processing started`);
+          await processAndUpload(channelId, days, responseUrl);
+          console.log(`[Slack Transcripts] Background processing completed`);
+        } catch (err) {
+          console.error('[Slack Transcripts] Background processing failed:', err);
+          if (responseUrl) {
+            await fetch(responseUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                response_type: 'ephemeral',
+                text: `❌ Failed to generate transcripts: ${(err as Error).message}`,
+              }),
+            }).catch(() => {});
+          }
+        }
       });
 
       return NextResponse.json({
@@ -133,10 +135,10 @@ async function processAndUpload(
 
   console.log(`[Slack Transcripts] Fetching transcripts since ${cutoffIso}`);
 
-  // Query transcripts from the last N days
+  // Query transcripts from the last N days (include participants for speaker mapping)
   const query = await sql`
-    SELECT i.id, i.external_id, i.title, i.timestamp, i.blob_url, i.metadata,
-           d.name as deal_name, d.crm_id, d.account_name
+    SELECT i.id, i.external_id, i.title, i.timestamp, i.blob_url, i.metadata, i.participants,
+           d.name as deal_name, d.crm_id, d.account_name, d.stage
     FROM interactions i
     LEFT JOIN deals d ON i.deal_id = d.id
     WHERE i.type = 'call'
@@ -193,16 +195,37 @@ async function processAndUpload(
       const callId = transcript.external_id;
       const filename = `${date}_${dealName}_${callId}.json`;
 
-      // Enrich with metadata
+      // Build speaker map from participants
+      const speakerMap = buildSpeakerMap(transcript.participants);
+
+      // Parse and enrich transcript
+      const parsed = JSON.parse(content);
+
+      // Map speaker IDs to names in turns
+      const enrichedTurns = parsed.turns?.map((turn: any) => {
+        const speakerId = String(turn.speakerId || turn.speaker || 'unknown');
+        const speakerInfo = speakerMap.get(speakerId);
+        return {
+          ...turn,
+          speakerName: speakerInfo?.name || null,
+          speakerEmail: speakerInfo?.email || null,
+          speakerType: speakerInfo?.isAnrok ? 'anrok' : 'customer',
+          speakerTitle: speakerInfo?.title || null,
+        };
+      });
+
       const enriched = {
-        ...JSON.parse(content),
+        ...parsed,
+        turns: enrichedTurns || parsed.turns,
         _metadata: {
           title: transcript.title,
           timestamp: transcript.timestamp,
           dealName: transcript.deal_name,
           accountName: transcript.account_name,
           crmId: transcript.crm_id,
+          stage: transcript.stage,
         },
+        _participants: transcript.participants,
       };
 
       zip.file(`transcripts/${filename}`, JSON.stringify(enriched, null, 2));
@@ -273,4 +296,32 @@ async function processAndUpload(
 
     throw uploadError;
   }
+}
+
+/**
+ * Build speaker map from participants data
+ */
+function buildSpeakerMap(participants: any[]): Map<string, {
+  name: string;
+  email: string | null;
+  title: string | null;
+  isAnrok: boolean;
+}> {
+  const speakerMap = new Map();
+  if (!participants || !Array.isArray(participants)) return speakerMap;
+
+  for (const p of participants) {
+    const speakerId = p.speakerId || p.id;
+    if (!speakerId) continue;
+
+    const name = p.name || p.emailAddress?.split('@')[0] || 'Unknown';
+    const email = p.emailAddress || null;
+    const title = p.title || null;
+    const isAnrok = (email?.toLowerCase().includes('@anrok.com') ||
+                     email?.toLowerCase().includes('@anrok.io') ||
+                     p.affiliation === 'Internal');
+
+    speakerMap.set(String(speakerId), { name, email, title, isAnrok });
+  }
+  return speakerMap;
 }
