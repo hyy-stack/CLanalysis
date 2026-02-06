@@ -116,11 +116,14 @@ async function processAndUpload(
 
   const slack = new WebClient(slackToken);
 
-  // First, find the deal
+  // First, find the deal (trim any whitespace from input)
+  const cleanCrmId = crmId.trim();
+  console.log(`[Deal Transcripts] Looking up CRM ID: "${cleanCrmId}" (length: ${cleanCrmId.length})`);
+
   const dealQuery = await sql`
     SELECT id, name, stage, account_name, crm_id
     FROM deals
-    WHERE crm_id = ${crmId}
+    WHERE crm_id = ${cleanCrmId}
   `;
 
   if (dealQuery.rows.length === 0) {
@@ -144,7 +147,7 @@ async function processAndUpload(
            d.name as deal_name, d.crm_id, d.account_name, d.stage
     FROM interactions i
     JOIN deals d ON i.deal_id = d.id
-    WHERE d.crm_id = ${crmId}
+    WHERE d.crm_id = ${cleanCrmId}
       AND i.type = 'call'
       AND i.blob_url IS NOT NULL
     ORDER BY i.timestamp ASC
