@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@vercel/postgres';
+import { requireApiKey, isAuthError } from '@/lib/auth/api-key';
 import { retrieveContent } from '@/lib/blob/storage';
 import JSZip from 'jszip';
 
@@ -14,9 +15,9 @@ import JSZip from 'jszip';
  */
 export async function GET(request: NextRequest) {
   // Verify API key
-  const apiKey = request.headers.get('x-api-key');
-  if (apiKey !== process.env.INTERNAL_API_KEY) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const authResult = await requireApiKey(request);
+  if (isAuthError(authResult)) {
+    return authResult;
   }
 
   const searchParams = request.nextUrl.searchParams;
@@ -175,9 +176,9 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   // Verify API key
-  const apiKey = request.headers.get('x-api-key');
-  if (apiKey !== process.env.INTERNAL_API_KEY) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const authResult = await requireApiKey(request);
+  if (isAuthError(authResult)) {
+    return authResult;
   }
 
   try {

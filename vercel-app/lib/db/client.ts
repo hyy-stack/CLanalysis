@@ -1,5 +1,5 @@
 import { sql } from '@vercel/postgres';
-import type { Deal, Interaction, Analysis, ManualEmail } from '@/types/database';
+import type { Deal, Interaction, Analysis, ManualEmail, ApiKey } from '@/types/database';
 
 /**
  * Database client for Vercel Postgres operations
@@ -425,13 +425,101 @@ export async function getAnalysesForDeal(dealId: string): Promise<Analysis[]> {
  */
 export async function listDealsWithActivity(limit: number = 50): Promise<Deal[]> {
   const result = await sql`
-    SELECT DISTINCT d.* 
+    SELECT DISTINCT d.*
     FROM deals d
     LEFT JOIN interactions i ON d.id = i.deal_id
     ORDER BY d.updated_at DESC
     LIMIT ${limit}
   `;
-  
+
   return result.rows as Deal[];
+}
+
+// =============================================================================
+// API Key Management
+// =============================================================================
+
+/**
+ * Create a new API key record (key hash already computed)
+ */
+export async function createApiKey(data: {
+  name: string;
+  description?: string;
+  keyHash: string;
+  keyPrefix: string;
+  createdBy?: string;
+  metadata?: Record<string, unknown>;
+}): Promise<ApiKey> {
+  const result = await sql`
+    INSERT INTO api_keys (name, description, key_hash, key_prefix, created_by, metadata)
+    VALUES (
+      ${data.name},
+      ${data.description || null},
+      ${data.keyHash},
+      ${data.keyPrefix},
+      ${data.createdBy || null},
+      ${JSON.stringify(data.metadata || {})}
+    )
+    RETURNING *
+  `;
+
+  return result.rows[0] as ApiKey;
+}
+
+/**
+ * Find an active (non-revoked) API key by its hash
+ */
+export async function findApiKeyByHash(keyHash: string): Promise<ApiKey | null> {
+  const result = await sql`
+    SELECT * FROM api_keys
+    WHERE key_hash = ${keyHash}
+    AND revoked_at IS NULL
+  `;
+
+  return (result.rows[0] as ApiKey) || null;
+}
+
+/**
+ * Update the last_used_at timestamp for an API key
+ */
+export async function updateApiKeyLastUsed(keyId: string): Promise<void> {
+  await sql`
+    UPDATE api_keys
+    SET last_used_at = NOW()
+    WHERE id = ${keyId}
+  `;
+}
+
+/**
+ * List all API keys (optionally including revoked)
+ */
+export async function listApiKeys(includeRevoked: boolean = false): Promise<ApiKey[]> {
+  let result;
+
+  if (includeRevoked) {
+    result = await sql`
+      SELECT * FROM api_keys
+      ORDER BY created_at DESC
+    `;
+  } else {
+    result = await sql`
+      SELECT * FROM api_keys
+      WHERE revoked_at IS NULL
+      ORDER BY created_at DESC
+    `;
+  }
+
+  return result.rows as ApiKey[];
+}
+
+/**
+ * Revoke an API key
+ */
+export async function revokeApiKey(keyId: string, revokedBy?: string): Promise<void> {
+  await sql`
+    UPDATE api_keys
+    SET revoked_at = NOW(), revoked_by = ${revokedBy || null}
+    WHERE id = ${keyId}
+  `;
 }
 

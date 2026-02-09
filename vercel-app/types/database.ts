@@ -95,3 +95,17 @@ export interface DifferentiatorAssessment {
   proofPoint: boolean;
 }
 
+export interface ApiKey {
+  id: string;
+  name: string;
+  description?: string;
+  key_hash: string;
+  key_prefix: string;
+  created_by?: string;
+  created_at: Date;
+  last_used_at?: Date;
+  revoked_at?: Date;
+  revoked_by?: string;
+  metadata?: Record<string, unknown>;
+}
+

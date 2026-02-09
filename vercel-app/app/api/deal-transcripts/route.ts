@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { after } from 'next/server';
 import { sql } from '@vercel/postgres';
 import { WebClient } from '@slack/web-api';
+import { requireApiKey, isAuthError } from '@/lib/auth/api-key';
 import { retrieveContent } from '@/lib/blob/storage';
 import JSZip from 'jszip';
 
@@ -44,9 +45,10 @@ export async function POST(request: NextRequest) {
       crmId = body.crm_id;
       responseUrl = body.response_url;
 
-      const apiKey = request.headers.get('x-api-key') || body.api_key;
-      if (apiKey !== process.env.INTERNAL_API_KEY) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      // Verify API key (supports both legacy and new keys)
+      const authResult = await requireApiKey(request);
+      if (isAuthError(authResult)) {
+        return authResult;
       }
 
       console.log(`[Deal Transcripts] API request for CRM ID: ${crmId}`);

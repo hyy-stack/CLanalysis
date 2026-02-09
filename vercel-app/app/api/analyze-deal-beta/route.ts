@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { requireApiKey } from '@/lib/auth/api-key';
+import { requireApiKey, isAuthError } from '@/lib/auth/api-key';
 import {
   getDealByCrmId,
   getDealById,
@@ -64,10 +64,13 @@ export async function POST(request: NextRequest) {
     console.log('[Beta Analysis] Request received');
 
     // Require API key for this endpoint
-    const authError = requireApiKey(request);
-    if (authError) {
-      console.error('[Beta Analysis] Auth failed:', authError.status);
-      return authError;
+    const authResult = await requireApiKey(request);
+    if (isAuthError(authResult)) {
+      console.error('[Beta Analysis] Auth failed:', authResult.status);
+      return authResult;
+    }
+    if (authResult.apiKeyName) {
+      console.log(`[Beta Analysis] Authenticated via key: ${authResult.apiKeyName}`);
     }
 
     const body = await request.json();

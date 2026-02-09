@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { requireApiKey } from '@/lib/auth/api-key';
+import { requireApiKey, isAuthError } from '@/lib/auth/api-key';
 import { GongClient } from '@/lib/gong/client';
 import { uploadTranscript } from '@/lib/blob/storage';
 import { upsertDeal, createInteraction, interactionExists } from '@/lib/db/client';
@@ -24,8 +24,8 @@ const BackfillRequestSchema = z.object({
 export async function POST(request: NextRequest) {
   try {
     // Require API key
-    const authError = requireApiKey(request);
-    if (authError) return authError;
+    const authResult = await requireApiKey(request);
+    if (isAuthError(authResult)) return authResult;
     
     const body = await request.json();
     const { crmId, callIds, fromDate, toDate, autoAnalyze } = BackfillRequestSchema.parse(body);

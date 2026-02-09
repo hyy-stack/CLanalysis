@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { requireApiKey } from '@/lib/auth/api-key';
+import { requireApiKey, isAuthError } from '@/lib/auth/api-key';
 import { uploadEmail } from '@/lib/blob/storage';
 import { upsertDeal, createManualEmail, getDealByCrmId } from '@/lib/db/client';
 import { randomUUID } from 'crypto';
@@ -30,8 +30,8 @@ const ImportRequestSchema = z.object({
 export async function POST(request: NextRequest) {
   try {
     // Require API key for this endpoint
-    const authError = requireApiKey(request);
-    if (authError) return authError;
+    const authResult = await requireApiKey(request);
+    if (isAuthError(authResult)) return authResult;
     
     const body = await request.json();
     

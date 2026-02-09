@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { requireApiKey } from '@/lib/auth/api-key';
+import { requireApiKey, isAuthError } from '@/lib/auth/api-key';
 import {
   getDealByCrmId,
   getDealById,
@@ -34,12 +34,15 @@ const AnalyzeRequestSchema = z.object({
 export async function POST(request: NextRequest) {
   try {
     console.log('[Analysis] Request received');
-    
+
     // Require API key for this endpoint
-    const authError = requireApiKey(request);
-    if (authError) {
-      console.error('[Analysis] Auth failed:', authError.status);
-      return authError;
+    const authResult = await requireApiKey(request);
+    if (isAuthError(authResult)) {
+      console.error('[Analysis] Auth failed:', authResult.status);
+      return authResult;
+    }
+    if (authResult.apiKeyName) {
+      console.log(`[Analysis] Authenticated via key: ${authResult.apiKeyName}`);
     }
     
     const body = await request.json();

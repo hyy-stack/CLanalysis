@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { requireApiKey } from '@/lib/auth/api-key';
+import { requireApiKey, isAuthError } from '@/lib/auth/api-key';
 import { getDealByCrmId, getLatestAnalysis } from '@/lib/db/client';
 import { createSalesforceClient } from '@/lib/salesforce/client';
 import { createGoogleSheetsClient } from '@/lib/google/sheets';
@@ -28,10 +28,13 @@ export async function POST(request: NextRequest) {
     console.log('[Track Deal] Request received');
 
     // Require API key for this endpoint
-    const authError = requireApiKey(request);
-    if (authError) {
+    const authResult = await requireApiKey(request);
+    if (isAuthError(authResult)) {
       console.error('[Track Deal] Auth failed');
-      return authError;
+      return authResult;
+    }
+    if (authResult.apiKeyName) {
+      console.log(`[Track Deal] Authenticated via key: ${authResult.apiKeyName}`);
     }
 
     const body = await request.json();
