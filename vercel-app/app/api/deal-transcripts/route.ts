@@ -44,6 +44,7 @@ export async function POST(request: NextRequest) {
       channelId = body.channel_id || body.channel;
       crmId = body.crm_id;
       responseUrl = body.response_url;
+      const download = body.download === true;
 
       // Verify API key (supports both legacy and new keys)
       const authResult = await requireApiKey(request);
@@ -51,7 +52,15 @@ export async function POST(request: NextRequest) {
         return authResult;
       }
 
-      console.log(`[Deal Transcripts] API request for CRM ID: ${crmId}`);
+      console.log(`[Deal Transcripts] API request for CRM ID: ${crmId}, download: ${download}`);
+
+      // Direct download mode - return ZIP file instead of posting to Slack
+      if (download) {
+        if (!crmId) {
+          return NextResponse.json({ error: 'Missing crm_id' }, { status: 400 });
+        }
+        return await processAndDownload(crmId);
+      }
     }
 
     if (!crmId) {
@@ -101,6 +110,131 @@ export async function POST(request: NextRequest) {
     console.error('[Deal Transcripts] Error:', error);
     return NextResponse.json({ error: 'Failed to process request' }, { status: 500 });
   }
+}
+
+/**
+ * Process transcripts for a deal and return as direct ZIP download
+ */
+async function processAndDownload(crmId: string): Promise<Response> {
+  const cleanCrmId = crmId.trim();
+  console.log(`[Deal Transcripts] Direct download for CRM ID: "${cleanCrmId}"`);
+
+  const dealQuery = await sql`
+    SELECT id, name, stage, account_name, crm_id
+    FROM deals
+    WHERE crm_id = ${cleanCrmId}
+  `;
+
+  if (dealQuery.rows.length === 0) {
+    return NextResponse.json({ error: `No deal found with CRM ID: ${crmId}` }, { status: 404 });
+  }
+
+  const deal = dealQuery.rows[0];
+  console.log(`[Deal Transcripts] Found deal: ${deal.name} (${deal.stage})`);
+
+  const query = await sql`
+    SELECT i.id, i.external_id, i.title, i.timestamp, i.blob_url, i.metadata, i.participants,
+           d.name as deal_name, d.crm_id, d.account_name, d.stage
+    FROM interactions i
+    JOIN deals d ON i.deal_id = d.id
+    WHERE d.crm_id = ${cleanCrmId}
+      AND i.type = 'call'
+      AND i.blob_url IS NOT NULL
+    ORDER BY i.timestamp ASC
+  `;
+
+  const transcripts = query.rows;
+  console.log(`[Deal Transcripts] Found ${transcripts.length} transcripts for ${deal.name}`);
+
+  if (transcripts.length === 0) {
+    return NextResponse.json({ error: `No transcripts found for deal: ${deal.name}` }, { status: 404 });
+  }
+
+  // Create ZIP file
+  const zip = new JSZip();
+
+  const manifest = {
+    exportDate: new Date().toISOString(),
+    deal: {
+      crmId: deal.crm_id,
+      name: deal.name,
+      stage: deal.stage,
+      accountName: deal.account_name,
+    },
+    totalTranscripts: transcripts.length,
+    dateRange: {
+      earliest: transcripts[0]?.timestamp,
+      latest: transcripts[transcripts.length - 1]?.timestamp,
+    },
+  };
+  zip.file('manifest.json', JSON.stringify(manifest, null, 2));
+
+  let processed = 0;
+
+  for (const transcript of transcripts) {
+    try {
+      const content = await retrieveContent(transcript.blob_url);
+      const speakerMap = buildSpeakerMap(transcript.participants);
+      const parsed = JSON.parse(content);
+
+      const enrichedTurns = parsed.turns?.map((turn: any) => {
+        const speakerId = String(turn.speakerId || turn.speaker || 'unknown');
+        const speakerInfo = speakerMap.get(speakerId);
+        return {
+          ...turn,
+          speakerName: speakerInfo?.name || null,
+          speakerEmail: speakerInfo?.email || null,
+          speakerType: speakerInfo?.isAnrok ? 'anrok' : 'customer',
+          speakerTitle: speakerInfo?.title || null,
+        };
+      });
+
+      const enriched = {
+        ...parsed,
+        turns: enrichedTurns || parsed.turns,
+        _metadata: {
+          title: transcript.title,
+          timestamp: transcript.timestamp,
+          dealName: transcript.deal_name,
+          accountName: transcript.account_name,
+          crmId: transcript.crm_id,
+          stage: transcript.stage,
+        },
+        _participants: transcript.participants,
+      };
+
+      const seq = String(processed + 1).padStart(3, '0');
+      const date = new Date(transcript.timestamp).toISOString().split('T')[0];
+      const titleSlug = (transcript.title || 'call')
+        .replace(/[^a-zA-Z0-9]/g, '_')
+        .substring(0, 40);
+      const filename = `${seq}_${date}_${titleSlug}.json`;
+
+      zip.file(`transcripts/${filename}`, JSON.stringify(enriched, null, 2));
+      processed++;
+    } catch (err) {
+      console.error(`[Deal Transcripts] Failed to process ${transcript.external_id}:`, err);
+    }
+  }
+
+  console.log(`[Deal Transcripts] Processed ${processed} transcripts for download`);
+
+  const zipBuffer = await zip.generateAsync({
+    type: 'arraybuffer',
+    compression: 'DEFLATE',
+    compressionOptions: { level: 6 },
+  });
+
+  const dealSlug = deal.name.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 30);
+  const filename = `${dealSlug}_transcripts.zip`;
+
+  return new Response(zipBuffer, {
+    headers: {
+      'Content-Type': 'application/zip',
+      'Content-Disposition': `attachment; filename="${filename}"`,
+      'Content-Length': zipBuffer.byteLength.toString(),
+    },
+  });
 }
 
 /**
