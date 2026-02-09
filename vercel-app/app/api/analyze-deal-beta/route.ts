@@ -27,6 +27,7 @@ import type { ComEnhancedStructuredData } from '@/types/database';
 const AnalyzeRequestSchema = z.object({
   crmId: z.string().optional(),
   dealId: z.string().uuid().optional(),
+  skipSlack: z.boolean().optional().default(false),
 }).refine(data => data.crmId || data.dealId, {
   message: 'Either crmId or dealId must be provided',
 });
@@ -74,9 +75,9 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    console.log('[Beta Analysis] Request body:', { crmId: body.crmId, dealId: body.dealId });
+    console.log('[Beta Analysis] Request body:', { crmId: body.crmId, dealId: body.dealId, skipSlack: body.skipSlack });
 
-    const { crmId, dealId } = AnalyzeRequestSchema.parse(body);
+    const { crmId, dealId, skipSlack } = AnalyzeRequestSchema.parse(body);
 
     console.log('[Beta Analysis] Starting CoM Enhanced analysis for:', crmId || dealId);
 
@@ -180,11 +181,13 @@ export async function POST(request: NextRequest) {
       console.warn('[Beta Analysis] Could not parse structured data from response');
     }
 
-    // Post to beta Slack channel
+    // Post to beta Slack channel (unless skipSlack is set)
     let slackThreadTs: string | undefined;
     const betaChannel = process.env.SLACK_CHANNEL_BETA;
 
-    if (betaChannel) {
+    if (skipSlack) {
+      console.log('[Beta Analysis] Skipping Slack post (skipSlack=true)');
+    } else if (betaChannel) {
       try {
         const slackClient = new SlackClient(
           process.env.SLACK_BOT_TOKEN!,
