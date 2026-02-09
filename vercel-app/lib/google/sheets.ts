@@ -45,7 +45,7 @@ export class GoogleSheetsClient {
    * Append a row of deal tracking data to the sheet
    * Skips column D (Manager) to preserve any formulas there
    */
-  async appendDealTracking(data: DealTrackingData, sheetName: string = 'Raw Data'): Promise<void> {
+  async appendDealTracking(data: DealTrackingData, sheetName: string = 'All Deals'): Promise<void> {
     console.log(`[Google Sheets] Appending deal tracking for: ${data.opportunity}`);
 
     // First, append a row with just columns A-C
@@ -66,7 +66,7 @@ export class GoogleSheetsClient {
         },
       });
 
-      // Extract the row number from the updated range (e.g., "Raw Data!A5:C5" -> 5)
+      // Extract the row number from the updated range (e.g., "All Deals!A5:C5" -> 5)
       const updatedRange = appendResponse.data.updates?.updatedRange || '';
       const rowMatch = updatedRange.match(/!A(\d+):/);
       const rowNumber = rowMatch ? parseInt(rowMatch[1]) : null;
@@ -106,7 +106,7 @@ export class GoogleSheetsClient {
    * Update or insert a deal row (upsert by opportunity name)
    * Skips column D (Manager) to preserve any formulas there
    */
-  async upsertDealTracking(data: DealTrackingData, sheetName: string = 'Raw Data'): Promise<void> {
+  async upsertDealTracking(data: DealTrackingData, sheetName: string = 'All Deals'): Promise<void> {
     console.log(`[Google Sheets] Upserting deal tracking for: ${data.opportunity}`);
 
     try {
