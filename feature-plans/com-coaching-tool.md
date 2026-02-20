@@ -198,8 +198,11 @@ After the existing `analyze-deal` fire-and-forget fires, add:
 // Trigger coaching asynchronously - fire and forget
 fetch(`${PRODUCTION_URL}/api/coach-deal`, {
   method: 'POST',
-  headers: { 'Authorization': `Bearer ${INTERNAL_API_KEY}` },
-  body: JSON.stringify({ crmId })
+  headers: {
+    'Content-Type': 'application/json',
+    'X-API-Key': apiKey,
+  },
+  body: JSON.stringify({ dealId: deal.id }),
 })
 ```
 
