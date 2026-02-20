@@ -57,6 +57,36 @@ export class ClaudeClient {
     };
   }
 
+
+  /**
+   * Send a system + user prompt to Claude and return raw text output.
+   * Used by the coaching pipeline — does NOT parse for specific headers.
+   */
+  async analyzeRaw(systemPrompt: string, userPrompt: string): Promise<string> {
+    console.log('[Claude] Sending raw coaching request...');
+    console.log(`[Claude] System prompt length: ${systemPrompt.length} chars`);
+    console.log(`[Claude] User prompt length: ${userPrompt.length} chars`);
+
+    const message = await this.client.messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 4096,
+      system: systemPrompt,
+      messages: [
+        {
+          role: 'user',
+          content: userPrompt,
+        },
+      ],
+    });
+
+    const response = message.content[0].type === 'text'
+      ? message.content[0].text
+      : '';
+
+    console.log(`[Claude] Raw response length: ${response.length} chars`);
+    return response;
+  }
+
   /**
    * Parse Claude's markdown response into structured sections
    * Looks for common headers and extracts content

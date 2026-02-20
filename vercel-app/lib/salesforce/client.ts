@@ -25,6 +25,25 @@ interface SalesforceOpportunity {
   Account?: {
     Name?: string;
   };
+  // CoM custom fields
+  Pain__c?: string;
+  Value_Drivers__c?: string;
+  Desired_Future_State_After_PBOs__c?: string;
+  Measure_Results_Metrics__c?: string;
+  Decision_Criteria__c?: string;
+  Differentiators__c?: string;
+  Mantra__c?: string;
+}
+
+export interface CoMFields {
+  stageName: string | null;
+  identifiedPain: string | null;
+  valueDrivers: string | null;
+  desiredFutureState: string | null;
+  metrics: string | null;
+  decisionCriteria: string | null;
+  differentiators: string | null;
+  mantra: string | null;
 }
 
 export class SalesforceClient {
@@ -124,6 +143,41 @@ export class SalesforceClient {
       return opportunity;
     } catch (error) {
       console.error(`[Salesforce] Failed to fetch opportunity ${opportunityId}:`, error);
+      return null;
+    }
+  }
+
+
+  /**
+   * Fetch CoM custom fields and StageName for an Opportunity
+   * Used by the coaching pipeline to assess field maturity against stage expectations
+   */
+  async getCoMFields(opportunityId: string): Promise<CoMFields | null> {
+    console.log(`[Salesforce] Fetching CoM fields for opportunity: ${opportunityId}`);
+
+    try {
+      const fields = [
+        'Id', 'StageName',
+        'Pain__c', 'Value_Drivers__c', 'Desired_Future_State_After_PBOs__c',
+        'Measure_Results_Metrics__c', 'Decision_Criteria__c',
+        'Differentiators__c', 'Mantra__c',
+      ].join(',');
+      const endpoint = `/services/data/v59.0/sobjects/Opportunity/${opportunityId}?fields=${fields}`;
+
+      const opportunity = await this.request<SalesforceOpportunity>(endpoint);
+
+      return {
+        stageName: opportunity.StageName || null,
+        identifiedPain: opportunity.Pain__c || null,
+        valueDrivers: opportunity.Value_Drivers__c || null,
+        desiredFutureState: opportunity.Desired_Future_State_After_PBOs__c || null,
+        metrics: opportunity.Measure_Results_Metrics__c || null,
+        decisionCriteria: opportunity.Decision_Criteria__c || null,
+        differentiators: opportunity.Differentiators__c || null,
+        mantra: opportunity.Mantra__c || null,
+      };
+    } catch (error) {
+      console.error(`[Salesforce] Failed to fetch CoM fields for ${opportunityId}:`, error);
       return null;
     }
   }

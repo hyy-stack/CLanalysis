@@ -367,7 +367,7 @@ export async function createManualEmail(
  */
 export async function createAnalysis(
   dealId: string,
-  analysisType: 'active_health' | 'closed_lost' | 'closed_won' | 'customer_sentiment' | 'com_enhanced',
+  analysisType: 'active_health' | 'closed_lost' | 'closed_won' | 'customer_sentiment' | 'com_enhanced' | 'coaching_stage1' | 'coaching_digest',
   data: {
     execSummary: string;
     nextSteps: string;

@@ -550,6 +550,73 @@ export class SlackClient {
     return null;
   }
 
+
+  /**
+   * Post a CoM coaching digest to the private coaching Slack channel.
+   * Main message: deal + rep context header.
+   * Thread: the Slack-ready digest from Stage 2 of the coaching pipeline.
+   *
+   * @param dealName  - Name of the deal
+   * @param repName   - Name of the AE / deal owner
+   * @param callTitle - Title of the Gong call
+   * @param callDate  - Timestamp of the call
+   * @param digest    - The Slack-ready coaching digest (< 300 words, pre-formatted)
+   * @param channelId - The private coaching channel ID
+   * @returns Slack thread timestamp
+   */
+  async postCoachingDigest(
+    dealName: string,
+    repName: string | null,
+    callTitle: string | null,
+    callDate: Date,
+    digest: string,
+    channelId: string
+  ): Promise<string> {
+    console.log(`[Slack] Posting coaching digest for "${dealName}" to coaching channel ${channelId}`);
+
+    const dateStr = callDate.toLocaleDateString('en-US', {
+      timeZone: 'America/Los_Angeles',
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+
+    const headerText = [
+      `🎯 *CoM Coaching: ${dealName}*`,
+      repName ? `*Rep:* ${repName}` : null,
+      callTitle ? `*Call:* ${callTitle}` : null,
+      `*Date:* ${dateStr}`,
+    ].filter(Boolean).join('  |  ');
+
+    // Post main message
+    const mainMessage = await this.client.chat.postMessage({
+      channel: channelId,
+      text: headerText,
+    });
+
+    const threadTs = mainMessage.ts!;
+    console.log('[Slack] Coaching header posted, thread_ts:', threadTs);
+
+    // Post digest in thread as plain text (avoids Slack "See more" truncation)
+    const MAX_CHUNK = 3000;
+    let remaining = digest
+      .replace(/\*\*([^*]+)\*\*/g, '*$1*') // **bold** → *bold* for Slack
+      .trim();
+
+    while (remaining.length > 0) {
+      const chunk = remaining.substring(0, MAX_CHUNK);
+      remaining = remaining.substring(MAX_CHUNK);
+      await this.client.chat.postMessage({
+        channel: channelId,
+        thread_ts: threadTs,
+        text: chunk,
+      });
+    }
+
+    console.log('[Slack] Coaching digest posted to thread:', threadTs);
+    return threadTs;
+  }
+
   /**
    * Test Slack connection
    */
