@@ -119,6 +119,7 @@ export async function POST(request: NextRequest) {
     // Write to Google Sheets
     console.log('[Track Deal] Writing to Google Sheets...');
     await sheetsClient.upsertDealTracking({
+      crmId,
       opportunity: opportunity.Name,
       account: sfFields.accountName || '',
       opportunityOwner: sfFields.ownerName || '',
