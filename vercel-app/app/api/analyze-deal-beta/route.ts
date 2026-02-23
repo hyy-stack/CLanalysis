@@ -244,6 +244,7 @@ export async function POST(request: NextRequest) {
       if (sheetsClient) {
         try {
           await sheetsClient.upsertDealTracking({
+            crmId: deal.crm_id,
             opportunity: sfOpportunityName || deal.name,
             account: sfFields?.accountName || deal.account_name || '',
             opportunityOwner: sfFields?.ownerName || deal.owner_name || '',

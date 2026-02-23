@@ -6,6 +6,7 @@
 import { google } from 'googleapis';
 
 interface DealTrackingData {
+  crmId?: string;
   opportunity: string;
   account: string;
   opportunityOwner: string;
@@ -93,6 +94,18 @@ export class GoogleSheetsClient {
             values: [rowEM],
           },
         });
+
+        // Write CRM ID to column P
+        if (data.crmId) {
+          await this.sheets.spreadsheets.values.update({
+            spreadsheetId: this.spreadsheetId,
+            range: `${sheetName}!P${rowNumber}`,
+            valueInputOption: 'USER_ENTERED',
+            requestBody: {
+              values: [[data.crmId]],
+            },
+          });
+        }
       }
 
       console.log('[Google Sheets] Successfully appended row');
@@ -103,27 +116,50 @@ export class GoogleSheetsClient {
   }
 
   /**
-   * Update or insert a deal row (upsert by opportunity name)
+   * Update or insert a deal row (upsert by CRM ID in column P, fallback to account name in column B)
    * Skips column D (Manager) to preserve any formulas there
    */
   async upsertDealTracking(data: DealTrackingData, sheetName: string = 'All Deals'): Promise<void> {
     console.log(`[Google Sheets] Upserting deal tracking for: ${data.opportunity}`);
 
     try {
-      // First, try to find existing row with this opportunity
-      const response = await this.sheets.spreadsheets.values.get({
-        spreadsheetId: this.spreadsheetId,
-        range: `${sheetName}!A:A`,
-      });
-
-      const values = response.data.values || [];
       let rowIndex = -1;
+      let matchedBy: 'crmId' | 'account' | 'none' = 'none';
 
-      for (let i = 0; i < values.length; i++) {
-        if (values[i][0] === data.opportunity) {
-          rowIndex = i + 1; // Sheets is 1-indexed
-          break;
+      // Primary: search column P for CRM ID
+      if (data.crmId) {
+        const pResponse = await this.sheets.spreadsheets.values.get({
+          spreadsheetId: this.spreadsheetId,
+          range: `${sheetName}!P:P`,
+        });
+        const pValues = pResponse.data.values || [];
+        for (let i = 0; i < pValues.length; i++) {
+          if (pValues[i][0] === data.crmId) {
+            rowIndex = i + 1;
+            matchedBy = 'crmId';
+            break;
+          }
         }
+      }
+
+      // Fallback: search column B for account name
+      if (rowIndex < 0 && data.account) {
+        const bResponse = await this.sheets.spreadsheets.values.get({
+          spreadsheetId: this.spreadsheetId,
+          range: `${sheetName}!B:B`,
+        });
+        const bValues = bResponse.data.values || [];
+        for (let i = 0; i < bValues.length; i++) {
+          if (bValues[i][0] === data.account) {
+            rowIndex = i + 1;
+            matchedBy = 'account';
+            break;
+          }
+        }
+      }
+
+      if (rowIndex > 0) {
+        console.log(`[Google Sheets] Found existing row ${rowIndex} (matched by ${matchedBy})`);
       }
 
       // Columns A-C (skip D which has Manager formula)
@@ -165,6 +201,19 @@ export class GoogleSheetsClient {
             values: [rowEM],
           },
         });
+
+        // Backfill CRM ID to column P if matched by account name
+        if (matchedBy === 'account' && data.crmId) {
+          await this.sheets.spreadsheets.values.update({
+            spreadsheetId: this.spreadsheetId,
+            range: `${sheetName}!P${rowIndex}`,
+            valueInputOption: 'USER_ENTERED',
+            requestBody: {
+              values: [[data.crmId]],
+            },
+          });
+          console.log(`[Google Sheets] Backfilled CRM ID to column P for row ${rowIndex}`);
+        }
 
         console.log(`[Google Sheets] Updated existing row ${rowIndex}`);
       } else {
