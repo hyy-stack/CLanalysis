@@ -214,8 +214,6 @@ export function formatStageContext(
     '**CoM Field Status:**',
   ];
 
-  const fieldKeys = Object.keys(FIELD_LABELS) as Array<keyof Omit<CoMFields, 'stageName'>>;
-
   for (const gap of gaps.filter(g => g.severity === 'critical')) {
     lines.push(`- 🚨 **[CRITICAL GAP]** ${gap.field}: Expected — ${gap.expectedState}`);
   }

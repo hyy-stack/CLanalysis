@@ -17,6 +17,7 @@ import {
   formatStageContext,
 } from '@/lib/coaching/stage-framework';
 import { runStage1, runStage2, formatTranscriptForCoaching } from '@/lib/coaching/pipeline';
+import { ClaudeClient } from '@/lib/claude/client';
 
 /**
  * CoM Coaching API
@@ -121,7 +122,8 @@ export async function POST(request: NextRequest) {
 
     // ── Stage 1: Discovery coaching ───────────────────────────────────────────
     console.log('[Coaching] Running Stage 1...');
-    const stage1 = await runStage1(transcriptText, dealInfo, stageContext, repName);
+    const claudeClient = new ClaudeClient(process.env.ANTHROPIC_API_KEY!);
+    const stage1 = await runStage1(transcriptText, dealInfo, stageContext, repName, claudeClient);
 
     const stage1Structured = {
       interaction_id: latestCall.id,
@@ -132,7 +134,7 @@ export async function POST(request: NextRequest) {
     };
 
     const stage1Row = await createAnalysis(deal.id, 'coaching_stage1', {
-      execSummary: stage1.coachingOutput,
+      execSummary: `CoM coaching: ${latestCall.title || latestCall.id}`,
       nextSteps: '',
       details: { fullText: stage1.coachingOutput },
       structuredData: stage1Structured,
@@ -146,7 +148,7 @@ export async function POST(request: NextRequest) {
     let slackTs: string | undefined;
 
     try {
-      const stage2 = await runStage2(transcriptText, stage1.coachingOutput, repName);
+      const stage2 = await runStage2(transcriptText, stage1.coachingOutput, repName, claudeClient);
 
       const stage2Structured = {
         interaction_id: latestCall.id,
@@ -168,7 +170,7 @@ export async function POST(request: NextRequest) {
             latestCall.title || null,
             new Date(latestCall.timestamp),
             stage2.slackDigest,
-            coachingChannelId
+            sfStageName,
           );
           console.log(`[Coaching] Slack digest posted, thread: ${slackTs}`);
         } catch (slackError) {

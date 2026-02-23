@@ -553,15 +553,15 @@ export class SlackClient {
 
   /**
    * Post a CoM coaching digest to the private coaching Slack channel.
-   * Main message: deal + rep context header.
-   * Thread: the Slack-ready digest from Stage 2 of the coaching pipeline.
+   * Mirrors the postAnalysis pattern: Block Kit summary as the main message,
+   * full digest posted in thread as plain text.
    *
    * @param dealName  - Name of the deal
    * @param repName   - Name of the AE / deal owner
    * @param callTitle - Title of the Gong call
    * @param callDate  - Timestamp of the call
    * @param digest    - The Slack-ready coaching digest (< 300 words, pre-formatted)
-   * @param channelId - The private coaching channel ID
+   * @param sfStage   - Salesforce StageName (optional)
    * @returns Slack thread timestamp
    */
   async postCoachingDigest(
@@ -570,9 +570,9 @@ export class SlackClient {
     callTitle: string | null,
     callDate: Date,
     digest: string,
-    channelId: string
+    sfStage?: string | null,
   ): Promise<string> {
-    console.log(`[Slack] Posting coaching digest for "${dealName}" to coaching channel ${channelId}`);
+    console.log(`[Slack] Posting coaching digest for "${dealName}" to channel ${this.channelId}`);
 
     const dateStr = callDate.toLocaleDateString('en-US', {
       timeZone: 'America/Los_Angeles',
@@ -581,33 +581,72 @@ export class SlackClient {
       year: 'numeric',
     });
 
-    const headerText = [
-      `🎯 *CoM Coaching: ${dealName}*`,
-      repName ? `*Rep:* ${repName}` : null,
-      callTitle ? `*Call:* ${callTitle}` : null,
-      `*Date:* ${dateStr}`,
-    ].filter(Boolean).join('  |  ');
+    const analysisTime = new Date().toLocaleString('en-US', {
+      timeZone: 'America/Los_Angeles',
+      dateStyle: 'short',
+      timeStyle: 'short',
+    });
+
+    // Build fields for the summary block
+    const fields: any[] = [];
+    if (repName) fields.push({ type: 'mrkdwn', text: `*Rep*\n${repName}` });
+    if (callTitle) fields.push({ type: 'mrkdwn', text: `*Call*\n${callTitle}` });
+    fields.push({ type: 'mrkdwn', text: `*Date*\n${dateStr}` });
+    if (sfStage) fields.push({ type: 'mrkdwn', text: `*SF Stage*\n${sfStage}` });
+
+    const mainBlocks: any[] = [
+      {
+        type: 'header',
+        text: { type: 'plain_text', text: `🎯 CoM Coaching: ${dealName}` },
+      },
+      {
+        type: 'section',
+        fields,
+      },
+      { type: 'divider' },
+      {
+        type: 'context',
+        elements: [
+          {
+            type: 'mrkdwn',
+            text: `🤖 Coaching analysis completed ${analysisTime} | View thread for details ⬇️`,
+          },
+        ],
+      },
+    ];
 
     // Post main message
     const mainMessage = await this.client.chat.postMessage({
-      channel: channelId,
-      text: headerText,
+      channel: this.channelId,
+      text: `🎯 CoM Coaching: ${dealName}`,
+      blocks: mainBlocks,
     });
 
     const threadTs = mainMessage.ts!;
     console.log('[Slack] Coaching header posted, thread_ts:', threadTs);
 
-    // Post digest in thread as plain text (avoids Slack "See more" truncation)
+    // Post digest header in thread
+    await this.client.chat.postMessage({
+      channel: this.channelId,
+      thread_ts: threadTs,
+      text: '*🎯 Coaching Digest*',
+    });
+
+    // Post digest as plain text in thread (avoids Slack "See more" truncation)
+    // Split at newline boundaries to avoid cutting mid-word or mid-markdown span
     const MAX_CHUNK = 3000;
     let remaining = digest
       .replace(/\*\*([^*]+)\*\*/g, '*$1*') // **bold** → *bold* for Slack
       .trim();
 
     while (remaining.length > 0) {
-      const chunk = remaining.substring(0, MAX_CHUNK);
-      remaining = remaining.substring(MAX_CHUNK);
+      const cutAt = remaining.length <= MAX_CHUNK
+        ? remaining.length
+        : (remaining.lastIndexOf('\n', MAX_CHUNK) > 0 ? remaining.lastIndexOf('\n', MAX_CHUNK) : MAX_CHUNK);
+      const chunk = remaining.substring(0, cutAt);
+      remaining = remaining.substring(cutAt).trimStart();
       await this.client.chat.postMessage({
-        channel: channelId,
+        channel: this.channelId,
         thread_ts: threadTs,
         text: chunk,
       });

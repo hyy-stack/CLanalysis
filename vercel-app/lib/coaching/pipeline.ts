@@ -95,7 +95,8 @@ export async function runStage1(
   transcript: string,
   dealInfo: string,
   stageContext: string,
-  repName: string | null
+  repName: string | null,
+  client: ClaudeClient
 ): Promise<Stage1Result> {
   console.log('[Coaching Stage 1] Loading prompt...');
   const prompt = await loadCoachingPrompt('com-discovery-coaching.md');
@@ -109,7 +110,6 @@ export async function runStage1(
 
   console.log(`[Coaching Stage 1] Prompt ready — system: ${prompt.system.length} chars, user: ${userPrompt.length} chars`);
 
-  const client = new ClaudeClient(process.env.ANTHROPIC_API_KEY!);
   const coachingOutput = await client.analyzeRaw(prompt.system, userPrompt);
 
   console.log(`[Coaching Stage 1] Complete — output: ${coachingOutput.length} chars`);
@@ -134,7 +134,8 @@ const BOT_FEEDBACK_DELIMITER = '---BOT-FEEDBACK---';
 export async function runStage2(
   transcript: string,
   stage1Output: string,
-  repName: string | null
+  repName: string | null,
+  client: ClaudeClient
 ): Promise<Stage2Result> {
   console.log('[Coaching Stage 2] Loading prompt...');
   const prompt = await loadCoachingPrompt('com-rep-digest.md');
@@ -147,7 +148,6 @@ export async function runStage2(
 
   console.log(`[Coaching Stage 2] Prompt ready — system: ${prompt.system.length} chars, user: ${userPrompt.length} chars`);
 
-  const client = new ClaudeClient(process.env.ANTHROPIC_API_KEY!);
   const fullResponse = await client.analyzeRaw(prompt.system, userPrompt);
 
   console.log(`[Coaching Stage 2] Complete — response: ${fullResponse.length} chars`);

@@ -115,7 +115,7 @@ export interface FieldGap {
 
 export interface MantraAssessment {
   value: string | null;
-  qualityForStage: 'not_yet' | 'emerging' | 'strong' | 'executive_resonant';
+  qualityForStage: 'not_yet' | 'emerging' | 'strong' | 'confirmed' | 'executive_resonant' | 'complete';
   isGap: boolean;
 }
 
