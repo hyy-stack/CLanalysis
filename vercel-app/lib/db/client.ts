@@ -79,71 +79,37 @@ export async function updateDealRoleSegment(dealId: string, roleSegment: string)
  */
 export async function updateDealSalesforceFields(
   dealId: string,
-  fields: { roleSegment?: string; arr?: number; ownerName?: string }
+  fields: { roleSegment?: string; arr?: number; ownerName?: string; stage?: string }
 ): Promise<void> {
-  // Build dynamic update - only update fields that are provided
-  const updates: string[] = [];
+  // Build dynamic SET clause
+  const setClauses: string[] = [];
   const values: any[] = [];
+  let paramIndex = 1;
 
   if (fields.roleSegment !== undefined) {
-    updates.push('role_segment');
+    setClauses.push(`role_segment = $${paramIndex++}`);
     values.push(fields.roleSegment);
   }
   if (fields.arr !== undefined) {
-    updates.push('arr');
+    setClauses.push(`arr = $${paramIndex++}`);
     values.push(fields.arr);
   }
   if (fields.ownerName !== undefined) {
-    updates.push('owner_name');
+    setClauses.push(`owner_name = $${paramIndex++}`);
     values.push(fields.ownerName);
   }
-
-  if (updates.length === 0) return;
-
-  // Use individual queries based on what's being updated
-  if (fields.roleSegment !== undefined && fields.arr !== undefined && fields.ownerName !== undefined) {
-    await sql`
-      UPDATE deals
-      SET role_segment = ${fields.roleSegment}, arr = ${fields.arr}, owner_name = ${fields.ownerName}, updated_at = NOW()
-      WHERE id = ${dealId}
-    `;
-  } else if (fields.roleSegment !== undefined && fields.arr !== undefined) {
-    await sql`
-      UPDATE deals
-      SET role_segment = ${fields.roleSegment}, arr = ${fields.arr}, updated_at = NOW()
-      WHERE id = ${dealId}
-    `;
-  } else if (fields.roleSegment !== undefined && fields.ownerName !== undefined) {
-    await sql`
-      UPDATE deals
-      SET role_segment = ${fields.roleSegment}, owner_name = ${fields.ownerName}, updated_at = NOW()
-      WHERE id = ${dealId}
-    `;
-  } else if (fields.arr !== undefined && fields.ownerName !== undefined) {
-    await sql`
-      UPDATE deals
-      SET arr = ${fields.arr}, owner_name = ${fields.ownerName}, updated_at = NOW()
-      WHERE id = ${dealId}
-    `;
-  } else if (fields.roleSegment !== undefined) {
-    await sql`
-      UPDATE deals
-      SET role_segment = ${fields.roleSegment}, updated_at = NOW()
-      WHERE id = ${dealId}
-    `;
-  } else if (fields.arr !== undefined) {
-    await sql`
-      UPDATE deals
-      SET arr = ${fields.arr}, updated_at = NOW()
-      WHERE id = ${dealId}
-    `;
-  } else if (fields.ownerName !== undefined) {
-    await sql`
-      UPDATE deals
-      SET owner_name = ${fields.ownerName}, updated_at = NOW()
-      WHERE id = ${dealId}
-    `;
+  if (fields.stage !== undefined) {
+    setClauses.push(`stage = $${paramIndex++}`);
+    values.push(fields.stage);
   }
+
+  if (setClauses.length === 0) return;
+
+  setClauses.push('updated_at = NOW()');
+  values.push(dealId);
+
+  const query = `UPDATE deals SET ${setClauses.join(', ')} WHERE id = $${paramIndex}`;
+  await sql.query(query, values);
 }
 
 /**
