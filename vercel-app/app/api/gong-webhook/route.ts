@@ -13,6 +13,7 @@ import {
 } from '@/lib/gong/webhook';
 import { uploadTranscript } from '@/lib/blob/storage';
 import { upsertDeal, createInteraction, interactionExists } from '@/lib/db/client';
+import { toCoachingStage } from '@/lib/coaching/stage-framework';
 
 /**
  * Gong Webhook Handler
@@ -267,6 +268,45 @@ export async function POST(request: NextRequest) {
                 console.error(`[Gong Webhook] Beta analysis trigger fetch error: ${err.message}`, err);
               }
             });
+
+          // Trigger CoM coaching only for Discover stage
+          const coachingStage = toCoachingStage(dealStages[0] || null);
+          if (coachingStage !== 'Discover') {
+            console.log(`[Gong Webhook] Skipping coaching — stage "${dealStages[0]}" maps to "${coachingStage}" (only Discover is coached)`);
+          } else {
+          // Trigger CoM coaching asynchronously - fire and forget
+          const coachUrl = 'https://anrok-deal-analyzer.vercel.app/api/coach-deal';
+          fetch(coachUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-API-Key': apiKey,
+            },
+            body: JSON.stringify({ dealId: deal.id }),
+          })
+            .then(response => {
+              if (!response.ok) {
+                console.error(`[Gong Webhook] Coaching trigger returned ${response.status}: ${response.statusText}`);
+                return response.text().then(text => {
+                  console.error(`[Gong Webhook] Response body: ${text.substring(0, 500)}`);
+                });
+              }
+              console.log(`[Gong Webhook] ✓ Coaching trigger accepted (status ${response.status})`);
+            })
+            .catch(err => {
+              const isSocketError = err.cause?.code === 'UND_ERR_SOCKET' ||
+                                   err.message?.includes('other side closed') ||
+                                   err.message?.includes('fetch failed');
+
+              if (isSocketError) {
+                console.log(`[Gong Webhook] Coaching trigger initiated (connection closed early - this is OK)`);
+              } else if (err.name === 'AbortError') {
+                console.log(`[Gong Webhook] Coaching trigger aborted (this is OK - request was sent)`);
+              } else {
+                console.error(`[Gong Webhook] Coaching trigger fetch error: ${err.message}`, err);
+              }
+            });
+          } // end Discover stage check
         }
       } catch (error) {
         console.error('[Gong Webhook] Failed to check/trigger auto-analysis:', error);

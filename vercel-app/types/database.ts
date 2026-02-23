@@ -48,11 +48,11 @@ export interface ManualEmail {
 export interface Analysis {
   id: string;
   deal_id: string;
-  analysis_type: 'active_health' | 'closed_lost' | 'closed_won' | 'customer_sentiment' | 'com_enhanced';
+  analysis_type: 'active_health' | 'closed_lost' | 'closed_won' | 'customer_sentiment' | 'com_enhanced' | 'coaching_stage1' | 'coaching_digest';
   exec_summary: string;
   next_steps: string;
   details: any;
-  structured_data?: ComEnhancedStructuredData;
+  structured_data?: ComEnhancedStructuredData | CoachingStage1Data | CoachingDigestData;
   slack_thread_ts?: string;
   slack_channel?: string;
   created_at: Date;
@@ -93,6 +93,39 @@ export interface DifferentiatorAssessment {
   relevant: 'High' | 'Medium' | 'Low' | 'N/A';
   positioned: 'Yes' | 'Partially' | 'No';
   proofPoint: boolean;
+}
+
+/**
+ * Structured data for coaching_stage1 analysis rows
+ */
+export interface CoachingStage1Data {
+  interaction_id: string;
+  stage: string; // Salesforce StageName
+  stageContext: string; // formatted markdown block injected into prompt
+  fieldGaps: FieldGap[];
+  mantraAssessment: MantraAssessment;
+}
+
+export interface FieldGap {
+  field: string;
+  expectedState: string;
+  actualValue: string | null;
+  severity: 'critical' | 'moderate' | 'low';
+}
+
+export interface MantraAssessment {
+  value: string | null;
+  qualityForStage: 'not_yet' | 'emerging' | 'strong' | 'confirmed' | 'executive_resonant' | 'complete';
+  isGap: boolean;
+}
+
+/**
+ * Structured data for coaching_digest analysis rows
+ */
+export interface CoachingDigestData {
+  interaction_id: string;
+  slackDigest: string; // Part 1 — rep-facing, < 300 words
+  botFeedback: string; // Part 2 — system-facing prompt improvement notes
 }
 
 export interface ApiKey {

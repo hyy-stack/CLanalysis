@@ -550,6 +550,112 @@ export class SlackClient {
     return null;
   }
 
+
+  /**
+   * Post a CoM coaching digest to the private coaching Slack channel.
+   * Mirrors the postAnalysis pattern: Block Kit summary as the main message,
+   * full digest posted in thread as plain text.
+   *
+   * @param dealName  - Name of the deal
+   * @param repName   - Name of the AE / deal owner
+   * @param callTitle - Title of the Gong call
+   * @param callDate  - Timestamp of the call
+   * @param digest    - The Slack-ready coaching digest (< 300 words, pre-formatted)
+   * @param sfStage   - Salesforce StageName (optional)
+   * @returns Slack thread timestamp
+   */
+  async postCoachingDigest(
+    dealName: string,
+    repName: string | null,
+    callTitle: string | null,
+    callDate: Date,
+    digest: string,
+    sfStage?: string | null,
+  ): Promise<string> {
+    console.log(`[Slack] Posting coaching digest for "${dealName}" to channel ${this.channelId}`);
+
+    const dateStr = callDate.toLocaleDateString('en-US', {
+      timeZone: 'America/Los_Angeles',
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+
+    const analysisTime = new Date().toLocaleString('en-US', {
+      timeZone: 'America/Los_Angeles',
+      dateStyle: 'short',
+      timeStyle: 'short',
+    });
+
+    // Build fields for the summary block
+    const fields: any[] = [];
+    if (repName) fields.push({ type: 'mrkdwn', text: `*Rep*\n${repName}` });
+    if (callTitle) fields.push({ type: 'mrkdwn', text: `*Call*\n${callTitle}` });
+    fields.push({ type: 'mrkdwn', text: `*Date*\n${dateStr}` });
+    if (sfStage) fields.push({ type: 'mrkdwn', text: `*SF Stage*\n${sfStage}` });
+
+    const mainBlocks: any[] = [
+      {
+        type: 'header',
+        text: { type: 'plain_text', text: `🎯 CoM Coaching: ${dealName}` },
+      },
+      {
+        type: 'section',
+        fields,
+      },
+      { type: 'divider' },
+      {
+        type: 'context',
+        elements: [
+          {
+            type: 'mrkdwn',
+            text: `🤖 Coaching analysis completed ${analysisTime} | View thread for details ⬇️`,
+          },
+        ],
+      },
+    ];
+
+    // Post main message
+    const mainMessage = await this.client.chat.postMessage({
+      channel: this.channelId,
+      text: `🎯 CoM Coaching: ${dealName}`,
+      blocks: mainBlocks,
+    });
+
+    const threadTs = mainMessage.ts!;
+    console.log('[Slack] Coaching header posted, thread_ts:', threadTs);
+
+    // Post digest header in thread
+    await this.client.chat.postMessage({
+      channel: this.channelId,
+      thread_ts: threadTs,
+      text: '*🎯 Coaching Digest*',
+    });
+
+    // Post digest as plain text in thread (avoids Slack "See more" truncation)
+    // Split at newline boundaries to avoid cutting mid-word or mid-markdown span
+    const MAX_CHUNK = 3000;
+    let remaining = digest
+      .replace(/\*\*([^*]+)\*\*/g, '*$1*') // **bold** → *bold* for Slack
+      .trim();
+
+    while (remaining.length > 0) {
+      const cutAt = remaining.length <= MAX_CHUNK
+        ? remaining.length
+        : (remaining.lastIndexOf('\n', MAX_CHUNK) > 0 ? remaining.lastIndexOf('\n', MAX_CHUNK) : MAX_CHUNK);
+      const chunk = remaining.substring(0, cutAt);
+      remaining = remaining.substring(cutAt).trimStart();
+      await this.client.chat.postMessage({
+        channel: this.channelId,
+        thread_ts: threadTs,
+        text: chunk,
+      });
+    }
+
+    console.log('[Slack] Coaching digest posted to thread:', threadTs);
+    return threadTs;
+  }
+
   /**
    * Test Slack connection
    */
