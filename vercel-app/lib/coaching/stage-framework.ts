@@ -1,4 +1,5 @@
-import type { CoMFields, FieldGap, MantraAssessment } from '@/types/database';
+import type { CoMFields } from '@/lib/salesforce/client';
+import type { FieldGap, MantraAssessment } from '@/types/database';
 
 /**
  * Stage-aware CoM coaching framework.
