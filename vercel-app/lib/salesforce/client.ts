@@ -37,6 +37,7 @@ interface SalesforceOpportunity {
 
 export interface CoMFields {
   stageName: string | null;
+  ownerName: string | null;
   identifiedPain: string | null;
   valueDrivers: string | null;
   desiredFutureState: string | null;
@@ -157,7 +158,7 @@ export class SalesforceClient {
 
     try {
       const fields = [
-        'Id', 'StageName',
+        'Id', 'StageName', 'OwnerId',
         'Pain__c', 'Value_Drivers__c', 'Desired_Future_State_After_PBOs__c',
         'Measure_Results_Metrics__c', 'Decision_Criteria__c',
         'Differentiators__c', 'Mantra__c',
@@ -166,8 +167,20 @@ export class SalesforceClient {
 
       const opportunity = await this.request<SalesforceOpportunity>(endpoint);
 
+      // Fetch owner name separately since Owner.Name requires a relationship query
+      let ownerName: string | null = null;
+      if (opportunity.OwnerId) {
+        try {
+          const user = await this.request<{ Name: string }>(`/services/data/v59.0/sobjects/User/${opportunity.OwnerId}?fields=Name`);
+          ownerName = user?.Name || null;
+        } catch {
+          // Non-fatal — fall back to DB value
+        }
+      }
+
       return {
         stageName: opportunity.StageName || null,
+        ownerName,
         identifiedPain: opportunity.Pain__c || null,
         valueDrivers: opportunity.Value_Drivers__c || null,
         desiredFutureState: opportunity.Desired_Future_State_After_PBOs__c || null,

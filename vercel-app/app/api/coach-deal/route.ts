@@ -120,7 +120,7 @@ export async function POST(request: NextRequest) {
 
     // ── Build deal info string ────────────────────────────────────────────────
     const dealInfo = formatDealInfo(deal);
-    const repName = deal.owner_name || null;
+    const repName = comFields?.ownerName || deal.owner_name || null;
     const sfInstanceUrl = process.env.SALESFORCE_INSTANCE_URL || 'https://anrok.lightning.force.com';
     const sfOpportunityUrl = deal.crm_id ? `${sfInstanceUrl}/${deal.crm_id}` : null;
 
