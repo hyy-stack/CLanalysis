@@ -6,7 +6,9 @@ import {
   getDealById,
   getInteractionsForDeal,
   createAnalysis,
+  getLatestComEnhancedAnalysis,
 } from '@/lib/db/client';
+import type { ComEnhancedStructuredData } from '@/types/database';
 import { retrieveTranscript } from '@/lib/blob/storage';
 import { createSalesforceClient } from '@/lib/salesforce/client';
 import { SlackClient } from '@/lib/slack/client';
@@ -119,11 +121,33 @@ export async function POST(request: NextRequest) {
     // ── Build deal info string ────────────────────────────────────────────────
     const dealInfo = formatDealInfo(deal);
     const repName = deal.owner_name || null;
+    const sfInstanceUrl = process.env.SALESFORCE_INSTANCE_URL || 'https://anrok.lightning.force.com';
+    const sfOpportunityUrl = deal.crm_id ? `${sfInstanceUrl}/${deal.crm_id}` : null;
+
+    // ── Resolve buyer scenario from prior com_enhanced analysis ───────────────
+    let buyerScenario = 'Unknown';
+
+    try {
+      const comEnhanced = await getLatestComEnhancedAnalysis(deal.id);
+      if (comEnhanced?.structured_data) {
+        const sd = comEnhanced.structured_data as ComEnhancedStructuredData;
+        if (sd.buyerScenario && sd.buyerScenario !== 'Unknown') {
+          buyerScenario = sd.buyerScenario;
+          console.log(`[Coaching] Buyer scenario resolved from com_enhanced: ${buyerScenario}`);
+        } else {
+          console.log('[Coaching] com_enhanced found but buyerScenario is Unknown — using Unknown');
+        }
+      } else {
+        console.log('[Coaching] No prior com_enhanced analysis — buyer scenario Unknown');
+      }
+    } catch (scenarioError) {
+      console.warn('[Coaching] Failed to resolve buyer scenario (non-fatal):', scenarioError);
+    }
 
     // ── Stage 1: Discovery coaching ───────────────────────────────────────────
     console.log('[Coaching] Running Stage 1...');
     const claudeClient = new ClaudeClient(process.env.ANTHROPIC_API_KEY!);
-    const stage1 = await runStage1(transcriptText, dealInfo, stageContext, repName, claudeClient);
+    const stage1 = await runStage1(transcriptText, dealInfo, stageContext, repName, claudeClient, buyerScenario);
 
     const stage1Structured = {
       interaction_id: latestCall.id,
@@ -131,6 +155,7 @@ export async function POST(request: NextRequest) {
       stageContext,
       fieldGaps,
       mantraAssessment,
+      buyerScenario,
     };
 
     const stage1Row = await createAnalysis(deal.id, 'coaching_stage1', {
@@ -148,7 +173,7 @@ export async function POST(request: NextRequest) {
     let slackTs: string | undefined;
 
     try {
-      const stage2 = await runStage2(transcriptText, stage1.coachingOutput, repName, claudeClient);
+      const stage2 = await runStage2(transcriptText, stage1.coachingOutput, repName, claudeClient, buyerScenario);
 
       const stage2Structured = {
         interaction_id: latestCall.id,
@@ -171,6 +196,7 @@ export async function POST(request: NextRequest) {
             new Date(latestCall.timestamp),
             stage2.slackDigest,
             sfStageName,
+            sfOpportunityUrl,
           );
           console.log(`[Coaching] Slack digest posted, thread: ${slackTs}`);
         } catch (slackError) {

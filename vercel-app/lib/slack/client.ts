@@ -571,6 +571,7 @@ export class SlackClient {
     callDate: Date,
     digest: string,
     sfStage?: string | null,
+    sfOpportunityUrl?: string | null,
   ): Promise<string> {
     console.log(`[Slack] Posting coaching digest for "${dealName}" to channel ${this.channelId}`);
 
@@ -603,6 +604,23 @@ export class SlackClient {
         type: 'section',
         fields,
       },
+    ];
+
+    if (sfOpportunityUrl) {
+      mainBlocks.push({
+        type: 'actions',
+        elements: [
+          {
+            type: 'button',
+            text: { type: 'plain_text', text: '🔗 Open in Salesforce' },
+            url: sfOpportunityUrl,
+            style: 'primary',
+          },
+        ],
+      });
+    }
+
+    mainBlocks.push(
       { type: 'divider' },
       {
         type: 'context',
@@ -613,7 +631,7 @@ export class SlackClient {
           },
         ],
       },
-    ];
+    );
 
     // Post main message
     const mainMessage = await this.client.chat.postMessage({

@@ -104,6 +104,7 @@ export interface CoachingStage1Data {
   stageContext: string; // formatted markdown block injected into prompt
   fieldGaps: FieldGap[];
   mantraAssessment: MantraAssessment;
+  buyerScenario?: string; // resolved from prior com_enhanced analysis ('Greenfield' | 'Rip-and-Replace' | 'Unknown')
 }
 
 export interface FieldGap {

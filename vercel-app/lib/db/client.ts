@@ -360,6 +360,22 @@ export async function createAnalysis(
 }
 
 /**
+ * Get the most recent com_enhanced analysis for a deal.
+ * Used by the coaching pipeline to resolve buyer scenario.
+ */
+export async function getLatestComEnhancedAnalysis(dealId: string): Promise<Analysis | null> {
+  const result = await sql`
+    SELECT * FROM analyses
+    WHERE deal_id = ${dealId}
+    AND analysis_type = 'com_enhanced'
+    ORDER BY created_at DESC
+    LIMIT 1
+  `;
+
+  return result.rows[0] as Analysis || null;
+}
+
+/**
  * Get latest analysis for a deal
  */
 export async function getLatestAnalysis(dealId: string): Promise<Analysis | null> {

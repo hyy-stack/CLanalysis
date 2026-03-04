@@ -40,6 +40,17 @@ async function loadCoachingPrompt(filename: string): Promise<{ system: string; u
   };
 }
 
+// ── Discovery context loading ────────────────────────────────────────────────
+
+/**
+ * Load the Anrok discovery context reference document.
+ * Injected as {{DISCOVERY_CONTEXT}} into Stage 1.
+ */
+async function loadDiscoveryContext(): Promise<string> {
+  const promptsDir = join(process.cwd(), 'prompts');
+  return readFile(join(promptsDir, 'anrok-discovery-context.md'), 'utf-8');
+}
+
 // ── Variable substitution ────────────────────────────────────────────────────
 
 type PromptVars = {
@@ -48,6 +59,8 @@ type PromptVars = {
   STAGE_CONTEXT?: string;
   REP_NAME?: string;
   COACHING_OUTPUT?: string;
+  BUYER_SCENARIO?: string;
+  DISCOVERY_CONTEXT?: string;
 };
 
 function fillCoachingPrompt(template: string, vars: PromptVars): string {
@@ -56,7 +69,9 @@ function fillCoachingPrompt(template: string, vars: PromptVars): string {
     .replace(/\{\{DEAL_INFO\}\}/g, vars.DEAL_INFO || '')
     .replace(/\{\{STAGE_CONTEXT\}\}/g, vars.STAGE_CONTEXT || '')
     .replace(/\{\{REP_NAME\}\}/g, vars.REP_NAME ? `**Rep:** ${vars.REP_NAME}` : '')
-    .replace(/\{\{COACHING_OUTPUT\}\}/g, vars.COACHING_OUTPUT || '');
+    .replace(/\{\{COACHING_OUTPUT\}\}/g, vars.COACHING_OUTPUT || '')
+    .replace(/\{\{BUYER_SCENARIO\}\}/g, vars.BUYER_SCENARIO || 'Unknown')
+    .replace(/\{\{DISCOVERY_CONTEXT\}\}/g, vars.DISCOVERY_CONTEXT || '');
 }
 
 // ── Transcript formatting ────────────────────────────────────────────────────
@@ -96,19 +111,25 @@ export async function runStage1(
   dealInfo: string,
   stageContext: string,
   repName: string | null,
-  client: ClaudeClient
+  client: ClaudeClient,
+  buyerScenario: string = 'Unknown'
 ): Promise<Stage1Result> {
-  console.log('[Coaching Stage 1] Loading prompt...');
-  const prompt = await loadCoachingPrompt('com-discovery-coaching.md');
+  console.log('[Coaching Stage 1] Loading prompt and discovery context...');
+  const [prompt, discoveryContext] = await Promise.all([
+    loadCoachingPrompt('com-discovery-coaching.md'),
+    loadDiscoveryContext(),
+  ]);
 
   const userPrompt = fillCoachingPrompt(prompt.user, {
     TRANSCRIPT: transcript,
     DEAL_INFO: dealInfo,
     STAGE_CONTEXT: stageContext,
     REP_NAME: repName || undefined,
+    BUYER_SCENARIO: buyerScenario,
+    DISCOVERY_CONTEXT: discoveryContext,
   });
 
-  console.log(`[Coaching Stage 1] Prompt ready — system: ${prompt.system.length} chars, user: ${userPrompt.length} chars`);
+  console.log(`[Coaching Stage 1] Prompt ready — system: ${prompt.system.length} chars, user: ${userPrompt.length} chars, scenario: ${buyerScenario}`);
 
   const coachingOutput = await client.analyzeRaw(prompt.system, userPrompt);
 
@@ -135,7 +156,8 @@ export async function runStage2(
   transcript: string,
   stage1Output: string,
   repName: string | null,
-  client: ClaudeClient
+  client: ClaudeClient,
+  buyerScenario: string = 'Unknown'
 ): Promise<Stage2Result> {
   console.log('[Coaching Stage 2] Loading prompt...');
   const prompt = await loadCoachingPrompt('com-rep-digest.md');
@@ -144,6 +166,7 @@ export async function runStage2(
     TRANSCRIPT: transcript,
     COACHING_OUTPUT: stage1Output,
     REP_NAME: repName || undefined,
+    BUYER_SCENARIO: buyerScenario,
   });
 
   console.log(`[Coaching Stage 2] Prompt ready — system: ${prompt.system.length} chars, user: ${userPrompt.length} chars`);
