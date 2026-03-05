@@ -38,7 +38,7 @@ type FieldExpectation = 'not_yet' | 'surface' | 'emerging' | 'confirmed' | 'comp
 
 interface StageExpectations {
   objective: string;
-  fields: Record<keyof Omit<CoMFields, 'stageName'>, {
+  fields: Record<keyof Omit<CoMFields, 'stageName' | 'ownerName'>, {
     expectation: FieldExpectation;
     description: string;
     severity: 'critical' | 'moderate' | 'low'; // severity if missing when expected
@@ -126,7 +126,7 @@ const STAGE_EXPECTATIONS: Record<CoachingStage, StageExpectations> = {
 
 // ── Field gap detection ──────────────────────────────────────────────────────
 
-const FIELD_LABELS: Record<keyof Omit<CoMFields, 'stageName'>, string> = {
+const FIELD_LABELS: Record<keyof Omit<CoMFields, 'stageName' | 'ownerName'>, string> = {
   identifiedPain:     'Identified Pain (Pain__c)',
   valueDrivers:       'Value Drivers (Value_Drivers__c)',
   desiredFutureState: 'Desired Future State (Desired_Future_State_After_PBOs__c)',
@@ -145,7 +145,7 @@ export function detectFieldGaps(comFields: CoMFields, sfStageName: string | null
   const expectations = STAGE_EXPECTATIONS[stage];
   const gaps: FieldGap[] = [];
 
-  const fieldKeys = Object.keys(FIELD_LABELS) as Array<keyof Omit<CoMFields, 'stageName'>>;
+  const fieldKeys = Object.keys(FIELD_LABELS) as Array<keyof Omit<CoMFields, 'stageName' | 'ownerName'>>;
 
   for (const key of fieldKeys) {
     const expectation = expectations.fields[key].expectation;
