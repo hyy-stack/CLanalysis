@@ -1,7 +1,10 @@
-import { put, del, head } from '@vercel/blob';
+import { put, del, get as getBlob } from '@vercel/blob';
+
+const PRIVATE_TOKEN = process.env.PRIVATE_BLOB_READ_WRITE_TOKEN;
 
 /**
- * Vercel Blob storage operations for large content
+ * Vercel Blob storage operations for large content.
+ * Uses the PRIVATE_BLOB_READ_WRITE_TOKEN for the private blob store.
  */
 
 /**
@@ -20,6 +23,7 @@ export async function uploadTranscript(
   const blob = await put(filename, content, {
     access: 'private',
     contentType: 'application/json',
+    token: PRIVATE_TOKEN,
   });
 
   return blob.url;
@@ -40,6 +44,7 @@ export async function uploadEmail(
   const blob = await put(filename, body, {
     access: 'private',
     contentType: 'text/plain',
+    token: PRIVATE_TOKEN,
   });
 
   return blob.url;
@@ -47,20 +52,33 @@ export async function uploadEmail(
 
 /**
  * Retrieve content from Blob storage.
- * Uses the Blob API head() to get an authenticated download URL,
- * which works for both public and private blobs.
+ * Detects whether the blob is in a public or private store based on the URL
+ * and uses the appropriate retrieval method.
  * @param blobUrl - The Blob URL
  * @returns Content as string
  */
 export async function retrieveContent(blobUrl: string): Promise<string> {
   try {
-    const metadata = await head(blobUrl);
-    const response = await fetch(metadata.downloadUrl);
+    if (blobUrl.includes('.private.blob.')) {
+      const result = await getBlob(blobUrl, { access: 'private', token: PRIVATE_TOKEN });
+      if (!result || result.statusCode !== 200) {
+        throw new Error(`Failed to fetch private blob: ${result?.statusCode ?? 'not found'}`);
+      }
+      const reader = result.stream.getReader();
+      const chunks: Uint8Array[] = [];
+      let chunk = await reader.read();
+      while (!chunk.done) {
+        chunks.push(chunk.value);
+        chunk = await reader.read();
+      }
+      return Buffer.concat(chunks).toString('utf-8');
+    }
 
+    // Public blob — direct fetch (legacy, during migration)
+    const response = await fetch(blobUrl);
     if (!response.ok) {
       throw new Error(`Failed to fetch blob: ${response.status}`);
     }
-
     return await response.text();
   } catch (error) {
     console.error('Error retrieving blob content:', error);
@@ -84,7 +102,8 @@ export async function retrieveTranscript(blobUrl: string): Promise<any> {
  */
 export async function deleteBlob(blobUrl: string): Promise<void> {
   try {
-    await del(blobUrl);
+    const token = blobUrl.includes('.private.blob.') ? PRIVATE_TOKEN : undefined;
+    await del(blobUrl, { token });
   } catch (error) {
     console.error('Error deleting blob:', error);
     // Don't throw - deletion failures shouldn't break the flow
