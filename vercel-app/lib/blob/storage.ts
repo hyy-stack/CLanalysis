@@ -1,4 +1,4 @@
-import { put, del } from '@vercel/blob';
+import { put, del, head } from '@vercel/blob';
 
 /**
  * Vercel Blob storage operations for large content
@@ -16,12 +16,12 @@ export async function uploadTranscript(
 ): Promise<string> {
   const filename = `transcripts/${callId}.json`;
   const content = JSON.stringify(transcript, null, 2);
-  
+
   const blob = await put(filename, content, {
-    access: 'public',
+    access: 'private',
     contentType: 'application/json',
   });
-  
+
   return blob.url;
 }
 
@@ -36,28 +36,31 @@ export async function uploadEmail(
   body: string
 ): Promise<string> {
   const filename = `emails/${emailId}.txt`;
-  
+
   const blob = await put(filename, body, {
-    access: 'public',
+    access: 'private',
     contentType: 'text/plain',
   });
-  
+
   return blob.url;
 }
 
 /**
- * Retrieve content from Blob storage
+ * Retrieve content from Blob storage.
+ * Uses the Blob API head() to get an authenticated download URL,
+ * which works for both public and private blobs.
  * @param blobUrl - The Blob URL
  * @returns Content as string
  */
 export async function retrieveContent(blobUrl: string): Promise<string> {
   try {
-    const response = await fetch(blobUrl);
-    
+    const metadata = await head(blobUrl);
+    const response = await fetch(metadata.downloadUrl);
+
     if (!response.ok) {
       throw new Error(`Failed to fetch blob: ${response.status}`);
     }
-    
+
     return await response.text();
   } catch (error) {
     console.error('Error retrieving blob content:', error);
