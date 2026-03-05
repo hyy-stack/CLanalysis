@@ -19,6 +19,7 @@ interface SalesforceOpportunity {
   ARR__c?: number;
   CloseDate?: string;
   Probability?: number;
+  OwnerId?: string;
   Owner?: {
     Name?: string;
   };
