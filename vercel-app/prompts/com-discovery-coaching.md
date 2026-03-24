@@ -75,9 +75,6 @@ Analyze this call transcript for discovery execution. Focus on what the rep shou
 
 ## Produce exactly this output (under 500 words total):
 
-### Discovery: [Strong / Developing / Weak / Not Performed]
-One sentence: what's the state of the business case after this call? (e.g., "Buyer scenario is [Greenfield/R&R], value driver is [Risk/Scale/Global], but NRIs are unquantified and no Required Capabilities established.")
-
 ### If You Fix One Thing
 The single highest-priority coaching point for this rep's next call:
 - **The moment:** one sentence citing what happened on the call
