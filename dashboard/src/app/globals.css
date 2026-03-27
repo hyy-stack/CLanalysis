@@ -1,0 +1,22 @@
+@import "tailwindcss";
+
+:root {
+  --bg:          #0F1023;
+  --card:        #FFFFFF;
+  --sidebar:     #3D3778;
+  --primary:     #6B63D5;
+  --primary-dk:  #5750C0;
+  --accent:      #F4956A;
+  --text-1:      #1E1B4B;
+  --text-2:      #6B6B8A;
+  --text-3:      #9B98B8;
+  --border:      #D8D5EC;
+  --shadow-card: 0 4px 24px rgba(0,0,8,0.35), 0 1px 6px rgba(0,0,8,0.20);
+}
+
+body {
+  background: var(--bg);
+  color: var(--text-1);
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
