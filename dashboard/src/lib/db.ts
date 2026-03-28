@@ -1,4 +1,4 @@
-import { sql } from '@vercel/postgres';
+import { sql } from '@/lib/db-client';
 import type {
   Deal,
   DealDetail,

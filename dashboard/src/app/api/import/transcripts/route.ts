@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import AdmZip from 'adm-zip';
-import { sql } from '@vercel/postgres';
+import { sql } from '@/lib/db-client';
 
 interface TranscriptMetadata {
   title?: string;

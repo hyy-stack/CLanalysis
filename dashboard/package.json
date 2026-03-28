@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",
+    "@neondatabase/serverless": "^1.0.2",
     "@types/adm-zip": "^0.5.8",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/papaparse": "^5.5.2",
