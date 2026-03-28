@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/gong-sync",
+      "schedule": "0 2 * * *"
+    }
+  ]
+}
