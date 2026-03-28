@@ -571,7 +571,7 @@ function MemberCard({ member, onDrillIn }: { member: MemberStats; onDrillIn: () 
 
 export default function DealsFilterPanel({ dealNames }: Props) {
   const searchParams = useSearchParams();
-  const initTab = searchParams.get('view') === 'team' ? 'team' : 'individual';
+  const initTab = searchParams.get('view') === 'individual' ? 'individual' : 'team';
   const [tab, setTab] = useState<'individual' | 'team'>(initTab);
 
   return (
