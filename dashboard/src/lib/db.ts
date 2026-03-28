@@ -274,6 +274,27 @@ export async function importDealMetadata(rows: CsvRow[]): Promise<{ updated: num
   return { updated, created };
 }
 
+/** Returns daily call injection stats for the last N days. */
+export async function getDailyCallVolume(days = 30): Promise<{ day: string; transcripts: number; deals: number }[]> {
+  const result = await sql.query(
+    `SELECT
+       DATE(timestamp AT TIME ZONE 'UTC') AS day,
+       COUNT(*) AS transcripts,
+       COUNT(DISTINCT deal_id) AS deals
+     FROM interactions
+     WHERE type = 'call'
+       AND timestamp >= NOW() - ($1 || ' days')::interval
+     GROUP BY DATE(timestamp AT TIME ZONE 'UTC')
+     ORDER BY day DESC`,
+    [days]
+  );
+  return result.rows.map(r => ({
+    day: r.day instanceof Date ? r.day.toISOString().slice(0, 10) : String(r.day),
+    transcripts: parseInt(r.transcripts, 10),
+    deals: parseInt(r.deals, 10),
+  }));
+}
+
 /** Returns distinct internal (Anrok) participants across all call interactions, deduped by email. */
 export async function getOwnerOptions(): Promise<{ name: string; email: string }[]> {
   const result = await sql.query(`
@@ -437,6 +458,40 @@ export async function getDealNames(filters: DealQueryFilters): Promise<string[]>
     params
   );
   return result.rows.map(r => r.name).filter(Boolean);
+}
+
+/** Returns individual transcript rows matching filters — used for the transcript list UI. */
+export async function getFilteredTranscriptList(filters: DealQueryFilters): Promise<{
+  id: string;
+  external_id: string | null;
+  title: string | null;
+  timestamp: string;
+  deal_id: string;
+  deal_name: string;
+  stage: string | null;
+}[]> {
+  const { conditions, params } = buildFilterConditions(filters);
+  const where = `WHERE ${conditions.join(' AND ')}`;
+
+  const result = await sql.query(
+    `SELECT
+       i.id, i.external_id, i.title, i.timestamp,
+       d.id AS deal_id, d.name AS deal_name, d.stage
+     FROM interactions i
+     JOIN deals d ON d.id = i.deal_id
+     ${where}
+     ORDER BY d.name ASC, i.timestamp DESC`,
+    params
+  );
+  return result.rows as {
+    id: string;
+    external_id: string | null;
+    title: string | null;
+    timestamp: string;
+    deal_id: string;
+    deal_name: string;
+    stage: string | null;
+  }[];
 }
 
 /** Returns ALL matching interactions with blob URLs — no cap. Used for map-reduce. */

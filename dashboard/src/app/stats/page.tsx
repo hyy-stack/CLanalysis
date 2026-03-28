@@ -1,98 +1,60 @@
 export const dynamic = 'force-dynamic';
 
-import { getStats } from '@/lib/db';
-import StatsCards from '@/components/StatsCards';
-import { TrendingUp, Phone, Mail, BarChart2 } from 'lucide-react';
-import { stageBadgeClass } from '@/lib/stages';
+import { getDailyCallVolume } from '@/lib/db';
 
-function activityIcon(type: string) {
-  if (type === 'call')     return <Phone size={14} className="text-indigo-400" />;
-  if (type === 'email')    return <Mail size={14} className="text-violet-400" />;
-  return <BarChart2 size={14} className="text-[#F4956A]" />;
-}
-
-function fmtTime(ts: string) {
-  return new Date(ts).toLocaleString('en-US', {
-    month: 'short', day: 'numeric',
-    hour: 'numeric', minute: '2-digit',
+function fmtDay(day: string) {
+  return new Date(day + 'T00:00:00Z').toLocaleDateString('en-US', {
+    weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC',
   });
 }
 
 export default async function StatsPage() {
-  const stats = await getStats();
-  const maxCount = Math.max(...stats.deals_by_stage.map(s => s.count), 1);
+  const rows = await getDailyCallVolume(30);
+  const totalTranscripts = rows.reduce((s, r) => s + r.transcripts, 0);
 
   return (
-    <div className="p-8 max-w-5xl mx-auto space-y-8">
+    <div className="p-8 max-w-3xl mx-auto space-y-6">
       <div>
-        <h1 className="text-2xl font-bold" style={{ color: 'var(--text-1)' }}>Statistics</h1>
-        <p className="text-sm mt-1" style={{ color: 'var(--text-2)' }}>Live view of your production database</p>
+        <h1 className="text-2xl font-bold" style={{ color: '#ffffff' }}>Daily Import Log</h1>
+        <p className="text-sm mt-1" style={{ color: 'rgba(255,255,255,0.45)' }}>
+          Last 30 days · {totalTranscripts} transcripts imported
+        </p>
       </div>
 
-      <StatsCards stats={stats} />
-
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* Stage breakdown */}
-        <div className="bg-white rounded-2xl shadow-sm p-6" style={{ border: '1px solid var(--border)', boxShadow: 'var(--shadow-card)' }}>
-          <div className="flex items-center gap-2 mb-5">
-            <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: '#EEF0FF' }}>
-              <TrendingUp size={14} style={{ color: 'var(--primary)' }} />
-            </div>
-            <h2 className="font-semibold text-sm" style={{ color: 'var(--text-1)' }}>Deals by Stage</h2>
+      <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid var(--border)', boxShadow: 'var(--shadow-card)' }}>
+        {rows.length === 0 ? (
+          <div className="bg-white p-6 text-sm" style={{ color: 'var(--text-3)' }}>
+            No calls imported in the last 30 days.
           </div>
-          {stats.deals_by_stage.length === 0 ? (
-            <p className="text-sm" style={{ color: 'var(--text-3)' }}>No stage data yet.</p>
-          ) : (
-            <div className="space-y-3">
-              {stats.deals_by_stage.map(({ stage, count }) => (
-                <div key={stage} className="flex items-center gap-3">
-                  <span className={`text-xs px-2 py-0.5 rounded-md font-medium w-44 truncate shrink-0 ${stageBadgeClass(stage)}`}>
-                    {stage}
-                  </span>
-                  <div className="flex-1 rounded-full h-2" style={{ background: 'var(--border)' }}>
-                    <div
-                      className="h-2 rounded-full"
-                      style={{
-                        width: `${Math.round((count / maxCount) * 100)}%`,
-                        background: 'linear-gradient(90deg, var(--primary), #8B83F5)',
-                      }}
-                    />
-                  </div>
-                  <span className="text-xs font-semibold w-5 text-right" style={{ color: 'var(--text-1)' }}>
-                    {count}
-                  </span>
-                </div>
+        ) : (
+          <table className="w-full text-sm bg-white">
+            <thead>
+              <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                <th className="text-left px-5 py-3 font-semibold text-xs" style={{ color: 'var(--text-3)' }}>Date</th>
+                <th className="text-right px-5 py-3 font-semibold text-xs" style={{ color: 'var(--text-3)' }}>Transcripts</th>
+                <th className="text-right px-5 py-3 font-semibold text-xs" style={{ color: 'var(--text-3)' }}>Deals</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row, i) => (
+                <tr
+                  key={row.day}
+                  style={{ borderBottom: i < rows.length - 1 ? '1px solid var(--border)' : undefined }}
+                >
+                  <td className="px-5 py-3 font-medium" style={{ color: 'var(--text-1)' }}>
+                    {fmtDay(row.day)}
+                  </td>
+                  <td className="px-5 py-3 text-right tabular-nums" style={{ color: 'var(--text-1)' }}>
+                    {row.transcripts}
+                  </td>
+                  <td className="px-5 py-3 text-right tabular-nums" style={{ color: 'var(--text-2)' }}>
+                    {row.deals}
+                  </td>
+                </tr>
               ))}
-            </div>
-          )}
-        </div>
-
-        {/* Recent activity */}
-        <div className="bg-white rounded-2xl shadow-sm p-6" style={{ border: '1px solid var(--border)', boxShadow: 'var(--shadow-card)' }}>
-          <h2 className="font-semibold text-sm mb-5" style={{ color: 'var(--text-1)' }}>Recent Activity</h2>
-          {stats.recent_activity.length === 0 ? (
-            <p className="text-sm" style={{ color: 'var(--text-3)' }}>No activity yet.</p>
-          ) : (
-            <ul className="space-y-3">
-              {stats.recent_activity.map((item, i) => (
-                <li key={i} className="flex items-start gap-3">
-                  <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5"
-                    style={{ background: '#F0EFFF' }}>
-                    {activityIcon(item.activity_type)}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium truncate" style={{ color: 'var(--text-1)' }}>
-                      {item.deal_name}
-                    </p>
-                    <p className="text-xs mt-0.5" style={{ color: 'var(--text-3)' }}>
-                      {item.account_name ?? item.stage ?? ''} · {fmtTime(item.activity_at)}
-                    </p>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   );

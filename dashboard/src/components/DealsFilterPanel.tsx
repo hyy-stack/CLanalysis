@@ -8,6 +8,8 @@ import { ROSTER, MANAGERS, getTeamMembers, roleBadge, roleBadgeClass } from '@/l
 import type { MemberStats } from '@/app/api/team-stats/route';
 import ChatPanel from '@/components/ChatPanel';
 import QueryResults from '@/components/QueryResults';
+import { TranscriptList } from '@/components/QueryResults';
+import type { TranscriptRow } from '@/components/QueryResults';
 
 interface Props {
   dealNames: string[];
@@ -193,6 +195,9 @@ function TeamPanel() {
   const [appliedFrom,    setAppliedFrom]    = useState('');
   const [appliedTo,      setAppliedTo]      = useState('');
 
+  // ── Transcript list ───────────────────────────────────────────────────────
+  const [transcripts, setTranscripts] = useState<TranscriptRow[]>([]);
+
   // ── Derived team member list ──────────────────────────────────────────────
   const teamMembers = manager ? getTeamMembers(manager) : [];
 
@@ -235,9 +240,23 @@ function TeamPanel() {
     setAppliedDeal(dn);
     setAppliedFrom(f);
     setAppliedTo(t);
-    fetch(`/api/team-stats?${buildQuery(mgr, owners, stg, dn, f, t)}`)
-      .then(r => r.json())
-      .then(d => { setMembers(d.members ?? []); setLoading(false); })
+
+    const txParams = new URLSearchParams();
+    txParams.set('owners', effectiveOwners.join(','));
+    if (stg) txParams.set('stage', stg);
+    if (dn)  txParams.set('dealName', dn);
+    if (f)   txParams.set('from', f);
+    if (t)   txParams.set('to', t);
+
+    Promise.all([
+      fetch(`/api/team-stats?${buildQuery(mgr, owners, stg, dn, f, t)}`).then(r => r.json()),
+      fetch(`/api/deals/interactions?${txParams}`).then(r => r.json()),
+    ])
+      .then(([statsData, txData]) => {
+        setMembers(statsData.members ?? []);
+        setTranscripts(txData.transcripts ?? []);
+        setLoading(false);
+      })
       .catch(() => { setError('Failed to load team stats'); setLoading(false); });
   };
 
@@ -460,13 +479,14 @@ function TeamPanel() {
         };
         const contextLabel = `${appliedOwners.length} rep${appliedOwners.length !== 1 ? 's' : ''} · ${totalDeals} deals · ${totalTranscripts} transcripts`;
         return (
-          <div className="pt-2" style={{ borderTop: '1px solid var(--border)' }}>
+          <div className="pt-2 space-y-5" style={{ borderTop: '1px solid var(--border)' }}>
             <ChatPanel
               filters={chatFilters}
               totalTranscripts={totalTranscripts}
               dealCount={totalDeals}
               contextLabel={contextLabel}
             />
+            <TranscriptList transcripts={transcripts} deals={[]} />
           </div>
         );
       })()}

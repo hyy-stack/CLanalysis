@@ -1,10 +1,20 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
+import { ExternalLink } from 'lucide-react';
 import { STAGE_ORDER, stageBadgeClass, stageLabel } from '@/lib/stages';
 import type { DealQueryFilters, DealQueryRow } from '@/lib/types';
 import ChatPanel from '@/components/ChatPanel';
+
+export interface TranscriptRow {
+  id: string;
+  external_id: string | null;
+  title: string | null;
+  timestamp: string;
+  deal_id: string;
+  deal_name: string;
+  stage: string | null;
+}
 
 interface Props {
   filters: DealQueryFilters;
@@ -15,9 +25,101 @@ function fmt(ts: string | null) {
   return new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+// ── Transcript list grouped by deal then stage ────────────────────────────────
+
+export function TranscriptList({ transcripts, deals }: { transcripts: TranscriptRow[]; deals: DealQueryRow[] }) {
+  if (transcripts.length === 0) return null;
+
+  // Build deal → stage map for ordering (falls back to stage on the transcript itself)
+  const dealStageMap = new Map(deals.map(d => [d.deal_id, d.stage]));
+
+  // Group by deal_id
+  const byDeal = new Map<string, TranscriptRow[]>();
+  for (const t of transcripts) {
+    if (!byDeal.has(t.deal_id)) byDeal.set(t.deal_id, []);
+    byDeal.get(t.deal_id)!.push(t);
+  }
+
+  // Sort deals by stage order
+  const stageIdx = (stage: string | null) => {
+    const i = (STAGE_ORDER as readonly string[]).indexOf(stageLabel(stage));
+    return i === -1 ? 999 : i;
+  };
+
+  const effectiveStage = (dealId: string, rows: TranscriptRow[]) =>
+    dealStageMap.get(dealId) ?? rows[0]?.stage ?? null;
+
+  const sortedDealIds = Array.from(byDeal.keys()).sort((a, b) => {
+    return stageIdx(effectiveStage(a, byDeal.get(a)!)) - stageIdx(effectiveStage(b, byDeal.get(b)!));
+  });
+
+  return (
+    <div className="space-y-2">
+      <h3 className="text-xs font-bold uppercase tracking-wide px-1" style={{ color: 'var(--text-3)' }}>
+        Transcripts
+      </h3>
+      <div className="space-y-3">
+        {sortedDealIds.map(dealId => {
+          const rows = byDeal.get(dealId)!;
+          const { deal_name, stage } = rows[0];
+          return (
+            <div key={dealId} className="bg-white rounded-2xl overflow-hidden"
+              style={{ border: '1px solid var(--border)', boxShadow: 'var(--shadow-card)' }}>
+              {/* Deal header */}
+              <div className="px-4 py-2.5 flex items-center gap-2.5"
+                style={{ borderBottom: '1px solid var(--border)', background: '#FAFAFA' }}>
+                <span className="font-semibold text-sm" style={{ color: 'var(--text-1)' }}>
+                  {deal_name || '(unnamed)'}
+                </span>
+                <span className={`text-xs px-2 py-0.5 rounded-lg font-medium ${stageBadgeClass(stage)}`}>
+                  {stageLabel(stage)}
+                </span>
+                <span className="ml-auto text-xs" style={{ color: 'var(--text-3)' }}>
+                  {rows.length} call{rows.length !== 1 ? 's' : ''}
+                </span>
+              </div>
+              {/* Individual transcripts */}
+              {rows.map((t, i) => (
+                <div key={t.id} className="px-4 py-2.5 flex items-center gap-3"
+                  style={i > 0 ? { borderTop: '1px solid var(--border)' } : {}}>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate" style={{ color: 'var(--text-1)' }}>
+                      {t.title || 'Untitled call'}
+                    </p>
+                    <p className="text-xs mt-0.5" style={{ color: 'var(--text-3)' }}>
+                      {fmt(t.timestamp)}
+                    </p>
+                  </div>
+                  {t.external_id && (
+                    <a
+                      href={`https://app.gong.io/call?id=${t.external_id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg shrink-0 transition-colors"
+                      style={{ background: '#EEF0FF', color: 'var(--primary)' }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--primary)'; (e.currentTarget as HTMLElement).style.color = 'white'; }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = '#EEF0FF'; (e.currentTarget as HTMLElement).style.color = 'var(--primary)'; }}
+                    >
+                      <ExternalLink size={12} />
+                      View in Gong
+                    </a>
+                  )}
+                </div>
+              ))}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
+
 export default function QueryResults({ filters }: Props) {
   const [deals, setDeals] = useState<DealQueryRow[]>([]);
   const [totalTranscripts, setTotalTranscripts] = useState(0);
+  const [transcripts, setTranscripts] = useState<TranscriptRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -30,12 +132,15 @@ export default function QueryResults({ filters }: Props) {
     if (filters.from)     params.set('from', filters.from);
     if (filters.to)       params.set('to', filters.to);
 
-    fetch(`/api/deals/query?${params}`)
-      .then(r => r.json())
-      .then(d => {
-        if (d.error) throw new Error(d.error);
-        setDeals(d.deals);
-        setTotalTranscripts(d.total_transcripts);
+    Promise.all([
+      fetch(`/api/deals/query?${params}`).then(r => r.json()),
+      fetch(`/api/deals/interactions?${params}`).then(r => r.json()),
+    ])
+      .then(([dealsData, txData]) => {
+        if (dealsData.error) throw new Error(dealsData.error);
+        setDeals(dealsData.deals);
+        setTotalTranscripts(dealsData.total_transcripts);
+        setTranscripts(txData.transcripts ?? []);
         setLoading(false);
       })
       .catch(e => { setError(e.message); setLoading(false); });
@@ -124,56 +229,12 @@ export default function QueryResults({ filters }: Props) {
         </div>
       ) : (
         <div className="space-y-5">
-          {/* Chat — full width on top */}
           <ChatPanel
             filters={filters}
             totalTranscripts={totalTranscripts}
             dealCount={deals.length}
           />
-
-          {/* Deal list — below chat */}
-          <div className="space-y-2">
-            <h3 className="text-xs font-bold uppercase tracking-wide px-1" style={{ color: 'var(--text-3)' }}>
-              Deals
-            </h3>
-            <div className="bg-white rounded-2xl overflow-hidden"
-              style={{ border: '1px solid var(--border)', boxShadow: 'var(--shadow-card)' }}>
-              {deals.map((deal, i) => (
-                <div
-                  key={deal.deal_id}
-                  className="px-4 py-3"
-                  style={i > 0 ? { borderTop: '1px solid var(--border)' } : {}}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <Link
-                      href={`/deals/${deal.deal_id}`}
-                      className="font-semibold text-sm truncate transition-colors hover:underline"
-                      style={{ color: 'var(--text-1)' }}
-                      onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'var(--primary)'}
-                      onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-1)'}
-                    >
-                      {deal.deal_name || '(unnamed)'}
-                    </Link>
-                    <span className="text-xs font-semibold px-2 py-0.5 rounded-lg shrink-0 whitespace-nowrap"
-                      style={{ background: '#EEF0FF', color: 'var(--primary)' }}>
-                      {deal.transcript_count} call{deal.transcript_count !== 1 ? 's' : ''}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                    <span className={`inline-block px-2 py-0.5 rounded-lg text-xs font-medium ${stageBadgeClass(deal.stage)}`}>
-                      {stageLabel(deal.stage)}
-                    </span>
-                    <span className="text-xs" style={{ color: 'var(--text-3)' }}>{fmt(deal.latest_timestamp)}</span>
-                  </div>
-                  {deal.exec_summary && (
-                    <p className="mt-1.5 text-xs line-clamp-2" style={{ color: 'var(--text-3)' }}>
-                      {deal.exec_summary}
-                    </p>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
+          <TranscriptList transcripts={transcripts} deals={deals} />
         </div>
       )}
     </div>
