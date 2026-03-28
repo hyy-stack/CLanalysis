@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { Suspense } from 'react';
 import { getFilterOptions } from '@/lib/db';
 import DealsFilterPanel from '@/components/DealsFilterPanel';

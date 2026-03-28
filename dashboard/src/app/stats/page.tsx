@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { getStats } from '@/lib/db';
 import StatsCards from '@/components/StatsCards';
 import { TrendingUp, Phone, Mail, BarChart2 } from 'lucide-react';
